@@ -39,6 +39,15 @@ BOTTOMS = (
     (date(2022, 11, 21), "2022 熊底参考"),
 )
 
+# Methodology window for honest (no-lookahead) thresholds:
+#   - ANCHOR drops the immature pre-2018 market (MVRV-style peaks decay over
+#     cycles; early data pollutes cross-cycle absolute thresholds).
+#   - CURRENT_CYCLE_START = last *completed* bear bottom. Honest thresholds use
+#     ONLY data at/before it, so the threshold for finding the current bottom is
+#     derived from past bears, never the current cycle or the future.
+ANCHOR = date(2018, 1, 1)
+CURRENT_CYCLE_START = BOTTOMS[-1][0]
+
 BITVIEW_SERIES = (
     "price",
     "market_cap",
@@ -324,6 +333,29 @@ def quantile_list(values: list[float], probability: float) -> float:
     return ordered[lower] * (1 - weight) + ordered[upper] * weight
 
 
+def past_cycle_quantile(values: dict[date, float], probability: float) -> float:
+    """Empirical quantile over ONLY completed past-cycle data (no lookahead).
+
+    A full-sample ``quantile(values, p)`` leaks the future AND the current cycle
+    into the threshold -- the lookahead bias flagged in the handoff. Restricting
+    the sample to ``ANCHOR..CURRENT_CYCLE_START`` (i.e. up to the last completed
+    bear bottom) means the threshold for finding the *current* bottom is derived
+    solely from past bears, matching the project methodology ("past bears ->
+    threshold -> current bear") rather than fitting a static truth to history.
+    """
+    sample = [value for day, value in values.items() if ANCHOR <= day <= CURRENT_CYCLE_START]
+    if len(sample) < 30:
+        # Series lacks enough pre-current-cycle history (e.g. a late-starting
+        # cohort). Fall back to anchored full sample: still drops immature
+        # pre-2018 data and contains no future, but does include this cycle.
+        sample = [value for day, value in values.items() if day >= ANCHOR]
+        print(
+            f"  warn: past-cycle sample too small for p={probability}; "
+            f"using anchored full sample ({len(sample)} pts, includes current cycle)"
+        )
+    return quantile_list(sample, probability)
+
+
 def serialise(values: dict[date, float]) -> list[list]:
     return [[day.isoformat(), float(f"{value:.10g}")] for day, value in sorted(values.items())]
 
@@ -407,10 +439,19 @@ def main() -> int:
     aviv = derive_aviv(raw)
     puell = derive_puell(raw)
     rc_30d = lag_change(raw["realized_cap"], 30, True)
-    rc_7d = lag_change(raw["realized_cap"], 7, True)
     sth_mvrv = derive_sth_mvrv(raw)
     hodler_npc = lag_change(raw["hodled_or_lost_supply"], 30, False)
     long_spent_share = aligned_ratio(obm_long, obm_total)
+    # Old-coin spending is dual-natured: tops = profit-taking distribution,
+    # bottoms = loss capitulation. Gate the share to MVRV<1 undervaluation days
+    # so spikes there mark capitulation (Glassnode's LTH Capitulation Risk uses
+    # MVRV<1 AND SOPR<1; we keep MVRV<1 here for more visible events). This is a
+    # confirmation line, not a standalone trigger.
+    spent_share_undervalued = {
+        day: long_spent_share[day]
+        for day in long_spent_share
+        if day in mvrv and mvrv[day] < 1.0
+    }
     psip = aligned_ratio(raw["supply_in_profit"], raw["supply"])
     supply_loss_share = aligned_ratio(raw["supply_in_loss"], raw["supply"])
     rup = aligned_ratio(raw["unrealized_profit"], raw["market_cap"])
@@ -425,6 +466,26 @@ def main() -> int:
     net_realized = normalised_net(raw["realized_profit_sum_24h"], raw["realized_loss_sum_24h"], raw["market_cap"])
     seller_exhaustion = derive_seller_exhaustion(raw, psip)
     thermocap_multiple = aligned_ratio(raw["market_cap"], raw["subsidy_cumulative_usd"])
+
+    # --- No-lookahead reference thresholds (Task A) -------------------------
+    # These six lines used to be full-sample quantiles, i.e. the threshold
+    # "knew the future". They now use only completed past-cycle data. The
+    # console prints the migration (old full-sample -> new past-cycle) so the
+    # shift is visible for manual review.
+    honest_targets = {
+        "spent_share_q90": (long_spent_share, 0.9),
+        "sth_net_q05": (sth_net, 0.05),
+        "net_realized_q05": (net_realized, 0.05),
+        "reserve_risk_q10": (raw["reserve_risk"], 0.1),
+        "seller_exhaustion_q10": (seller_exhaustion, 0.1),
+        "thermocap_q10": (thermocap_multiple, 0.1),
+    }
+    honest: dict[str, float] = {}
+    print("threshold migration (full-sample -> past-cycle, lookahead removed):")
+    for key, (series, probability) in honest_targets.items():
+        old_value = quantile(series, probability)
+        honest[key] = past_cycle_quantile(series, probability)
+        print(f"  {key:<26} {old_value:>14.6g} -> {honest[key]:>14.6g}")
 
     metrics = [
         metric(
@@ -455,13 +516,6 @@ def main() -> int:
             check=compare(rc_30d, raw["realized_cap_delta_1m_rate_ratio"]),
         ),
         metric(
-            "realized_cap_relative_npc_7d", "Realized Cap Relative NPC · 7d", "percent",
-            "已实现市值相对7日前的短期变化。", "RC(t) / RC(t-7d) - 1",
-            "BRK / Bitview Realized Cap", "自行计算", rc_7d,
-            [reference(0.0, "短期扩张/收缩分界")], "above",
-            check=compare(rc_7d, raw["realized_cap_delta_1w_rate_ratio"]),
-        ),
-        metric(
             "sth_mvrv", "STH-MVRV", "ratio", "150日以内UTXO的市场价值相对其已实现成本。",
             "Price × STH Supply / STH Realized Cap", "BRK / Bitview 基础日线", "自行计算（150日 cohort）", sth_mvrv,
             [reference(1.0, "短期持有者盈亏线"), reference(0.9, "浮亏观察线")], "below",
@@ -476,16 +530,19 @@ def main() -> int:
         ),
         metric(
             "hodler_npc_30d", "HODLer Net Position Change · 30d", "btc",
-            "HODLed or Lost Supply 的30日净变化。", "HODLedOrLostSupply(t) - HODLedOrLostSupply(t-30d)",
+            "HODLed or Lost Supply 的30日净变化（Glassnode LTH-NetPositionChange 口径，BTC 计）。",
+            "HODLedOrLostSupply(t) - HODLedOrLostSupply(t-30d)",
             "BRK / Bitview 基础日线", "自行计算", hodler_npc,
-            [reference(0.0, "净积累/净释放分界"), reference(-50_000.0, "释放压力观察线")], "above",
+            [reference(0.0, "净积累/净释放分界")], "above",
+            caveat="保持 Glassnode 权威 BTC 口径；原固定 -50000 阈值在供应增长下非平稳已移除——跨周期比较按各轮周期自身尺度看，或另加供应归一化副线。",
         ),
         metric(
             "spent_value_ge155d_share", ">=155d 花费价值占比", "percent",
-            "币龄至少155天的花费价值占全部花费价值比例。",
+            "币龄至少155天的花费价值占全部花费价值比例（老币花费）。顶底都会spike：顶部=获利派发，底部=投降；降为确认指标。",
             "Spent Value >=155d / Total Spent Value", "Open Bitcoin Metrics v0.1.0", "自行计算", long_spent_share,
-            [reference(quantile(long_spent_share, 0.9), "全样本90%分位（探索）")], "above",
-            caveat="该序列是UTXO花费价值占比，不是LTH供应，也不等同交易所流入。",
+            [reference(honest["spent_share_q90"], "过去周期90%分位（无前视）")], "above",
+            extra_lines=[("undervalued_old_spent", "低估期老币花费（MVRV<1）", spent_share_undervalued, "indicator")],
+            caveat="老币花费顶底双峰、单独不定向；副线只在 MVRV<1 低估期显示该占比——此时的 spike 才是投降性熊底确认（参考 Glassnode LTH Capitulation Risk 思路）。不作独立触发。主线是UTXO花费价值占比，不是LTH供应。",
         ),
         metric(
             "psip", "Percent Supply in Profit", "percent", "当前价格高于创建时价格的供应占比。",
@@ -530,7 +587,7 @@ def main() -> int:
             "长期与短期UTXO的每日已实现净盈亏占市值比例，两条曲线放在一起观察。",
             "Cohort Net P/L = (Cohort Realized Profit - Cohort Realized Loss) / Market Cap",
             "BRK / Bitview 基础日线", "自行计算（全链150日 cohort）", sth_net,
-            [reference(0.0, "LTH/STH 净盈亏分界"), reference(quantile(sth_net, 0.05), "STH全样本5%分位（探索）")], "below",
+            [reference(0.0, "LTH/STH 净盈亏分界"), reference(honest["sth_net_q05"], "STH过去周期5%分位（无前视）")], "below",
             primary_line_label="STH Net Realized P/L",
             primary_line_mode="net",
             extra_lines=[
@@ -546,28 +603,28 @@ def main() -> int:
             "normalized_net_realized_pnl", "Net Realized P/L / Market Cap", "percent",
             "全网每日已实现净盈亏占市值比例。",
             "(Realized Profit - Realized Loss) / Market Cap", "BRK / Bitview 基础日线", "自行计算", net_realized,
-            [reference(0.0, "净盈亏分界"), reference(quantile(net_realized, 0.05), "全样本5%分位（探索）")], "below",
+            [reference(0.0, "净盈亏分界"), reference(honest["net_realized_q05"], "过去周期5%分位（无前视）")], "below",
         ),
         metric(
             "reserve_risk", "Reserve Risk", "small",
             "价格相对HODL Bank的水平，结合长期持有信念与出售激励。",
             "Price / HODL Bank（BRK 实现）", "BRK / Bitview", "公开成品日线", raw["reserve_risk"],
-            [reference(quantile(raw["reserve_risk"], 0.1), "全样本10%分位（探索）")], "below",
+            [reference(honest["reserve_risk_q10"], "过去周期10%分位（无前视）")], "below",
             caveat="完整复算依赖VOCDD与HODL Bank历史状态，本原型绑定BRK公开实现。",
         ),
         metric(
             "seller_exhaustion", "Seller Exhaustion Constant", "small",
             "低盈利供应与低波动共同出现的卖方耗竭状态。",
             "PSIP × BRK 30d Price Volatility", "BRK / Bitview 基础日线", "自行计算", seller_exhaustion,
-            [reference(quantile(seller_exhaustion, 0.1), "全样本10%分位（探索）")], "below",
+            [reference(honest["seller_exhaustion_q10"], "过去周期10%分位（无前视）")], "below",
             check=compare(seller_exhaustion, raw["seller_exhaustion"]),
         ),
         metric(
             "thermocap_multiple", "Thermocap Multiple", "ratio",
             "市场价值相对累计矿工补贴美元价值的倍数。",
             "Market Cap / Subsidy Cumulative USD", "BRK / Bitview 基础日线", "自行计算", thermocap_multiple,
-            [reference(quantile(thermocap_multiple, 0.1), "全样本10%分位（探索）")], "below",
-            caveat="历史熊底倍数会跨周期漂移；分位线只供探索。",
+            [reference(honest["thermocap_q10"], "过去周期10%分位（无前视）")], "below",
+            caveat="历史熊底倍数会跨周期漂移；分位线基于过去周期、无前视。",
             check=compare(thermocap_multiple, raw["thermo_cap_multiple"]),
         ),
     ]
@@ -592,7 +649,7 @@ def main() -> int:
         "notes": [
             "这是一次性验证原型，不是交易信号或生产系统。",
             "参考线和有效/待定/无效判断只保存在当前页面内存，刷新后重置。",
-            "带“全样本分位”的默认线含前视信息，只用于肉眼探索，不可直接当回测阈值。",
+            "默认分位线基于过去周期数据（锚定2018、截止上一轮熊底），不含未来/本轮信息，可作为诚实阈值参考。",
             "价格和指标各有独立线性/对数坐标开关；含零或负值的指标不能使用对数坐标。",
         ],
     }
