@@ -1,0 +1,453 @@
+{
+  "prototype_question": "四证据家族能否用公开数据完成历史获取、UTC 日度对齐、缺失和新鲜度识别，并产出最小状态？",
+  "as_of": "2026-07-20",
+  "prototype_freshness_budget_days": 3,
+  "common_cutoff": "2026-07-14",
+  "common_cutoff_lag_days": 6,
+  "data_feasibility_verdict": "conditional go",
+  "overall_evidence_state": "gray_not_evaluated",
+  "overall_evidence_reason": "本原型没有设定或校准证据阈值，不计算红黄绿证据结论",
+  "families": [
+    {
+      "family": "market_valuation",
+      "family_label": "市场估值",
+      "metric": "mvrv",
+      "metric_label": "MVRV",
+      "unit": "ratio",
+      "data_state": "ready",
+      "evidence_state": "not_evaluated",
+      "latest_date": "2026-07-18",
+      "latest_value": 1.2253971926665221,
+      "aligned_date": "2026-07-14",
+      "aligned_value": 1.2276267731645218,
+      "freshness_lag_days": 2,
+      "missing_days": 0,
+      "source": "Coin Metrics Community API",
+      "lineage": "Direct field CapMVRVCur",
+      "experimental": false,
+      "reason": "数据获取、日度覆盖和原型新鲜度检查通过",
+      "candidate_metrics": [
+        "mvrv"
+      ]
+    },
+    {
+      "family": "time_weighted_valuation",
+      "family_label": "时间加权估值",
+      "metric": "cointime_price_daily_reconstruction",
+      "metric_label": "Cointime Price（日度重建）",
+      "unit": "USD/BTC",
+      "data_state": "conditional",
+      "evidence_state": "not_evaluated",
+      "latest_date": "2026-07-14",
+      "latest_value": 52450.183594522,
+      "aligned_date": "2026-07-14",
+      "aligned_value": 52450.183594522,
+      "freshness_lag_days": 6,
+      "missing_days": 0,
+      "source": "Coin Metrics Community API + Open Bitcoin Metrics v0.1.0 rolling CSV",
+      "lineage": "cumsum(PriceUSD * daily CDD) / cumulative coin-days stored; daily analogue of the published block-based model",
+      "experimental": true,
+      "reason": "源数据落后 6 天，超过原型预算 3 天；实验派生，尚未与独立实现交叉验证",
+      "candidate_metrics": [
+        "cointime_price_daily_reconstruction",
+        "cvdd_daily_reconstruction"
+      ]
+    },
+    {
+      "family": "active_capital_valuation",
+      "family_label": "活跃资本估值",
+      "metric": "aviv_daily_reconstruction",
+      "metric_label": "AVIV（日度重建）",
+      "unit": "ratio",
+      "data_state": "conditional",
+      "evidence_state": "not_evaluated",
+      "latest_date": "2026-07-14",
+      "latest_value": 0.8459817112784633,
+      "aligned_date": "2026-07-14",
+      "aligned_value": 0.8459817112784633,
+      "freshness_lag_days": 6,
+      "missing_days": 0,
+      "source": "Coin Metrics Community API + Open Bitcoin Metrics v0.1.0 rolling CSV",
+      "lineage": "PriceUSD / reconstructed True Market Mean Price",
+      "experimental": true,
+      "reason": "源数据落后 6 天，超过原型预算 3 天；实验派生，尚未与独立实现交叉验证",
+      "candidate_metrics": [
+        "tmmp_daily_reconstruction",
+        "aviv_daily_reconstruction"
+      ]
+    },
+    {
+      "family": "holder_behavior",
+      "family_label": "持有者行为",
+      "metric": "spent_value_ge155d_share",
+      "metric_label": "≥155 天老币花费占比",
+      "unit": "share",
+      "data_state": "conditional",
+      "evidence_state": "not_evaluated",
+      "latest_date": "2026-07-14",
+      "latest_value": 0.03530268297262799,
+      "aligned_date": "2026-07-14",
+      "aligned_value": 0.03530268297262799,
+      "freshness_lag_days": 6,
+      "missing_days": 0,
+      "source": "Open Bitcoin Metrics v0.1.0 rolling CSV",
+      "lineage": "obm_spent_value_ge155d_btc_daily / obm_spent_value_btc_daily; raw UTXO spend, not LTH supply",
+      "experimental": false,
+      "reason": "源数据落后 6 天，超过原型预算 3 天",
+      "candidate_metrics": [
+        "spent_value_ge155d_share"
+      ]
+    }
+  ],
+  "raw_series_profiles": [
+    {
+      "key": "cm_price",
+      "label": "Coin Metrics PriceUSD",
+      "unit": "USD/BTC",
+      "source": "Coin Metrics Community API",
+      "lineage": "Direct field PriceUSD",
+      "experimental": false,
+      "row_count": 5845,
+      "coverage_start": "2010-07-18",
+      "coverage_end": "2026-07-18",
+      "freshness_lag_days": 2,
+      "missing_days": 0,
+      "longest_gap_days": 0,
+      "invalid_values": 0
+    },
+    {
+      "key": "cm_market_cap",
+      "label": "Coin Metrics CapMrktCurUSD",
+      "unit": "USD",
+      "source": "Coin Metrics Community API",
+      "lineage": "Direct field CapMrktCurUSD",
+      "experimental": false,
+      "row_count": 5845,
+      "coverage_start": "2010-07-18",
+      "coverage_end": "2026-07-18",
+      "freshness_lag_days": 2,
+      "missing_days": 0,
+      "longest_gap_days": 0,
+      "invalid_values": 0
+    },
+    {
+      "key": "cm_mvrv",
+      "label": "Coin Metrics CapMVRVCur",
+      "unit": "ratio",
+      "source": "Coin Metrics Community API",
+      "lineage": "Direct field CapMVRVCur",
+      "experimental": false,
+      "row_count": 5845,
+      "coverage_start": "2010-07-18",
+      "coverage_end": "2026-07-18",
+      "freshness_lag_days": 2,
+      "missing_days": 0,
+      "longest_gap_days": 0,
+      "invalid_values": 0
+    },
+    {
+      "key": "cm_supply",
+      "label": "Coin Metrics SplyCur",
+      "unit": "BTC",
+      "source": "Coin Metrics Community API",
+      "lineage": "Direct field SplyCur",
+      "experimental": false,
+      "row_count": 6406,
+      "coverage_start": "2009-01-03",
+      "coverage_end": "2026-07-18",
+      "freshness_lag_days": 2,
+      "missing_days": 0,
+      "longest_gap_days": 0,
+      "invalid_values": 0
+    },
+    {
+      "key": "obm_cdd_btcxdays_daily",
+      "label": "OBM CDD",
+      "unit": "BTC-days",
+      "source": "Open Bitcoin Metrics v0.1.0 rolling CSV",
+      "lineage": "Direct rolling CSV",
+      "experimental": false,
+      "row_count": 6402,
+      "coverage_start": "2009-01-03",
+      "coverage_end": "2026-07-14",
+      "freshness_lag_days": 6,
+      "missing_days": 0,
+      "longest_gap_days": 0,
+      "invalid_values": 0
+    },
+    {
+      "key": "obm_liveliness_ratio_daily",
+      "label": "OBM Liveliness",
+      "unit": "ratio",
+      "source": "Open Bitcoin Metrics v0.1.0 rolling CSV",
+      "lineage": "Direct rolling CSV",
+      "experimental": false,
+      "row_count": 6402,
+      "coverage_start": "2009-01-03",
+      "coverage_end": "2026-07-14",
+      "freshness_lag_days": 6,
+      "missing_days": 0,
+      "longest_gap_days": 0,
+      "invalid_values": 0
+    },
+    {
+      "key": "obm_supply_btc_daily",
+      "label": "OBM Supply",
+      "unit": "BTC",
+      "source": "Open Bitcoin Metrics v0.1.0 rolling CSV",
+      "lineage": "Direct rolling CSV",
+      "experimental": false,
+      "row_count": 6404,
+      "coverage_start": "2009-01-01",
+      "coverage_end": "2026-07-14",
+      "freshness_lag_days": 6,
+      "missing_days": 0,
+      "longest_gap_days": 0,
+      "invalid_values": 0
+    },
+    {
+      "key": "obm_issuance_btc_daily",
+      "label": "OBM Issuance",
+      "unit": "BTC/day",
+      "source": "Open Bitcoin Metrics v0.1.0 rolling CSV",
+      "lineage": "Direct rolling CSV",
+      "experimental": false,
+      "row_count": 6404,
+      "coverage_start": "2009-01-01",
+      "coverage_end": "2026-07-14",
+      "freshness_lag_days": 6,
+      "missing_days": 0,
+      "longest_gap_days": 0,
+      "invalid_values": 0
+    },
+    {
+      "key": "obm_spent_value_btc_daily",
+      "label": "OBM Spent Value",
+      "unit": "BTC/day",
+      "source": "Open Bitcoin Metrics v0.1.0 rolling CSV",
+      "lineage": "Direct rolling CSV",
+      "experimental": false,
+      "row_count": 6404,
+      "coverage_start": "2009-01-01",
+      "coverage_end": "2026-07-14",
+      "freshness_lag_days": 6,
+      "missing_days": 0,
+      "longest_gap_days": 0,
+      "invalid_values": 0
+    },
+    {
+      "key": "obm_spent_value_ge155d_btc_daily",
+      "label": "OBM ≥155d Spent Value",
+      "unit": "BTC/day",
+      "source": "Open Bitcoin Metrics v0.1.0 rolling CSV",
+      "lineage": "Direct rolling CSV",
+      "experimental": false,
+      "row_count": 6404,
+      "coverage_start": "2009-01-01",
+      "coverage_end": "2026-07-14",
+      "freshness_lag_days": 6,
+      "missing_days": 0,
+      "longest_gap_days": 0,
+      "invalid_values": 0
+    }
+  ],
+  "history_samples": [
+    {
+      "sample": "2011 熊市低位",
+      "target_date": "2011-11-18",
+      "values": {
+        "market_valuation": {
+          "date": "2011-11-18",
+          "distance_days": 0,
+          "value": 0.42341662,
+          "unit": "ratio"
+        },
+        "time_weighted_valuation": {
+          "date": "2011-11-18",
+          "distance_days": 0,
+          "value": 4.140626899020746,
+          "unit": "USD/BTC"
+        },
+        "active_capital_valuation": {
+          "date": "2011-11-18",
+          "distance_days": 0,
+          "value": 0.27413907455813114,
+          "unit": "ratio"
+        },
+        "holder_behavior": {
+          "date": "2011-11-18",
+          "distance_days": 0,
+          "value": 0.0005967010130702465,
+          "unit": "share"
+        }
+      },
+      "coverage_check": "pass"
+    },
+    {
+      "sample": "2015 熊市低位",
+      "target_date": "2015-01-14",
+      "values": {
+        "market_valuation": {
+          "date": "2015-01-14",
+          "distance_days": 0,
+          "value": 0.56357972,
+          "unit": "ratio"
+        },
+        "time_weighted_valuation": {
+          "date": "2015-01-14",
+          "distance_days": 0,
+          "value": 244.29522666935108,
+          "unit": "USD/BTC"
+        },
+        "active_capital_valuation": {
+          "date": "2015-01-14",
+          "distance_days": 0,
+          "value": 0.37678735458166224,
+          "unit": "ratio"
+        },
+        "holder_behavior": {
+          "date": "2015-01-14",
+          "distance_days": 0,
+          "value": 0.0108391678882803,
+          "unit": "share"
+        }
+      },
+      "coverage_check": "pass"
+    },
+    {
+      "sample": "2018 熊市低位",
+      "target_date": "2018-12-15",
+      "values": {
+        "market_valuation": {
+          "date": "2018-12-15",
+          "distance_days": 0,
+          "value": 0.69048064,
+          "unit": "ratio"
+        },
+        "time_weighted_valuation": {
+          "date": "2018-12-15",
+          "distance_days": 0,
+          "value": 4162.645902312638,
+          "unit": "USD/BTC"
+        },
+        "active_capital_valuation": {
+          "date": "2018-12-15",
+          "distance_days": 0,
+          "value": 0.47844864652047575,
+          "unit": "ratio"
+        },
+        "holder_behavior": {
+          "date": "2018-12-15",
+          "distance_days": 0,
+          "value": 0.01090275781918916,
+          "unit": "share"
+        }
+      },
+      "coverage_check": "pass"
+    },
+    {
+      "sample": "2020 流动性冲击",
+      "target_date": "2020-03-16",
+      "values": {
+        "market_valuation": {
+          "date": "2020-03-16",
+          "distance_days": 0,
+          "value": 0.9005596,
+          "unit": "ratio"
+        },
+        "time_weighted_valuation": {
+          "date": "2020-03-16",
+          "distance_days": 0,
+          "value": 5387.238553050361,
+          "unit": "USD/BTC"
+        },
+        "active_capital_valuation": {
+          "date": "2020-03-16",
+          "distance_days": 0,
+          "value": 0.6475201555787156,
+          "unit": "ratio"
+        },
+        "holder_behavior": {
+          "date": "2020-03-16",
+          "distance_days": 0,
+          "value": 0.01648167485574521,
+          "unit": "share"
+        }
+      },
+      "coverage_check": "pass"
+    },
+    {
+      "sample": "2022 熊市低位",
+      "target_date": "2022-11-21",
+      "values": {
+        "market_valuation": {
+          "date": "2022-11-21",
+          "distance_days": 0,
+          "value": 0.777592696604,
+          "unit": "ratio"
+        },
+        "time_weighted_valuation": {
+          "date": "2022-11-21",
+          "distance_days": 0,
+          "value": 17666.058124877236,
+          "unit": "USD/BTC"
+        },
+        "active_capital_valuation": {
+          "date": "2022-11-21",
+          "distance_days": 0,
+          "value": 0.5301664921990804,
+          "unit": "ratio"
+        },
+        "holder_behavior": {
+          "date": "2022-11-21",
+          "distance_days": 0,
+          "value": 0.01185060961061922,
+          "unit": "share"
+        }
+      },
+      "coverage_check": "pass"
+    }
+  ],
+  "source_metadata": {
+    "coinmetrics_endpoint": "https://community-api.coinmetrics.io/v4/timeseries/asset-metrics?assets=btc&metrics=CapMVRVCur%2CCapMrktCurUSD%2CPriceUSD%2CSplyCur&frequency=1d&start_time=2009-01-01&page_size=1000",
+    "coinmetrics_rows_received": "6406",
+    "coinmetrics_time_convention": "UTC 00:00 daily observation from API time field",
+    "obm_commit_sha": "8ae6d726d2437b1fd5bfb6eacfca314c7433eb4e",
+    "obm_commit_date": "2026-07-19T02:57:29Z",
+    "obm_commit_url": "https://github.com/diegorllanos/open-bitcoin-metrics/commit/8ae6d726d2437b1fd5bfb6eacfca314c7433eb4e",
+    "obm_cdd_btcxdays_daily_url": "https://raw.githubusercontent.com/diegorllanos/open-bitcoin-metrics/8ae6d726d2437b1fd5bfb6eacfca314c7433eb4e/metrics/obm_cdd_btcxdays_daily/obm_cdd_btcxdays_daily.csv",
+    "obm_cdd_btcxdays_daily_release": "OBM v0.1.0",
+    "obm_cdd_btcxdays_daily_declared_unit": "BTC-days",
+    "obm_cdd_btcxdays_daily_declared_frequency": "daily",
+    "obm_cdd_btcxdays_daily_sha256": "d3abf1f1e907a6ee7e8627aa10ba7dabcb17f5b87e23073f606f1a601f720dbd",
+    "obm_liveliness_ratio_daily_url": "https://raw.githubusercontent.com/diegorllanos/open-bitcoin-metrics/8ae6d726d2437b1fd5bfb6eacfca314c7433eb4e/metrics/obm_liveliness_ratio_daily/obm_liveliness_ratio_daily.csv",
+    "obm_liveliness_ratio_daily_release": "OBM v0.1.0",
+    "obm_liveliness_ratio_daily_declared_unit": "ratio",
+    "obm_liveliness_ratio_daily_declared_frequency": "daily",
+    "obm_liveliness_ratio_daily_sha256": "fddc72275c2841b60fb3c379d0aa6af58a2deb0c4270f990bd5b2bb679aa87e3",
+    "obm_supply_btc_daily_url": "https://raw.githubusercontent.com/diegorllanos/open-bitcoin-metrics/8ae6d726d2437b1fd5bfb6eacfca314c7433eb4e/metrics/obm_supply_btc_daily/obm_supply_btc_daily.csv",
+    "obm_supply_btc_daily_release": "OBM v0.1.0",
+    "obm_supply_btc_daily_declared_unit": "BTC",
+    "obm_supply_btc_daily_declared_frequency": "daily",
+    "obm_supply_btc_daily_sha256": "928ff18a66362b08833eb59119fdc9c5276f8a8cef1d58e0d15ac3084b04af0b",
+    "obm_issuance_btc_daily_url": "https://raw.githubusercontent.com/diegorllanos/open-bitcoin-metrics/8ae6d726d2437b1fd5bfb6eacfca314c7433eb4e/metrics/obm_issuance_btc_daily/obm_issuance_btc_daily.csv",
+    "obm_issuance_btc_daily_release": "OBM v0.1.0",
+    "obm_issuance_btc_daily_declared_unit": "BTC",
+    "obm_issuance_btc_daily_declared_frequency": "daily",
+    "obm_issuance_btc_daily_sha256": "2197e7f793c4d193a46d444e06f7eb1bfeac017ac00de45b2c8514bf8ec171ea",
+    "obm_spent_value_btc_daily_url": "https://raw.githubusercontent.com/diegorllanos/open-bitcoin-metrics/8ae6d726d2437b1fd5bfb6eacfca314c7433eb4e/metrics/obm_spent_value_btc_daily/obm_spent_value_btc_daily.csv",
+    "obm_spent_value_btc_daily_release": "OBM v0.1.0",
+    "obm_spent_value_btc_daily_declared_unit": "BTC",
+    "obm_spent_value_btc_daily_declared_frequency": "daily",
+    "obm_spent_value_btc_daily_sha256": "8029bc90d4e75f44dfae7cd4f1ec97bc6196abe6eaeb3568943ba3c9c3de4c05",
+    "obm_spent_value_ge155d_btc_daily_url": "https://raw.githubusercontent.com/diegorllanos/open-bitcoin-metrics/8ae6d726d2437b1fd5bfb6eacfca314c7433eb4e/metrics/obm_spent_value_ge155d_btc_daily/obm_spent_value_ge155d_btc_daily.csv",
+    "obm_spent_value_ge155d_btc_daily_release": "OBM v0.1.0",
+    "obm_spent_value_ge155d_btc_daily_declared_unit": "BTC",
+    "obm_spent_value_ge155d_btc_daily_declared_frequency": "daily",
+    "obm_spent_value_ge155d_btc_daily_sha256": "c4dc6d34d14cb5dece84b22aaad477b7426f70d98d9f0ea49932b27b9f812420",
+    "obm_repository": "https://github.com/diegorllanos/open-bitcoin-metrics",
+    "obm_time_convention": "UTC calendar day",
+    "derivation_warning": "Cointime Price, CVDD, TMMP, AVIV and >=155d share are prototype reconstructions, not OBM-published scalar series",
+    "holder_share_undefined_rule": "Days before the first Coin Metrics price or with zero total spent value are excluded; 0/0 is not coerced to zero"
+  }
+}

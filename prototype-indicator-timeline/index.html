@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="dark" />
+    <title>PROTOTYPE — BTC 指标验证台</title>
+    <link rel="stylesheet" href="./styles.css?v=4" />
+  </head>
+  <body>
+    <div id="app" aria-live="polite">
+      <div class="loading-screen">
+        <p class="prototype-badge">PROTOTYPE / LOADING</p>
+        <h1>正在计算十九项链上指标</h1>
+        <div class="loading-rule"><span></span></div>
+      </div>
+    </div>
+    <div id="prototype-switcher" class="prototype-switcher" data-prototype-only>
+      <button type="button" data-direction="prev" aria-label="上一个视图">←</button>
+      <div>
+        <span>一次性验证原型</span>
+        <strong id="variant-label">A — 逐项验证台</strong>
+      </div>
+      <button type="button" data-direction="next" aria-label="下一个视图">→</button>
+    </div>
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.1/dist/echarts.min.js"></script>
+    <script src="./timeline-data.js?v=1"></script>
+    <script src="./app.js?v=15"></script>
+  </body>
+</html>
