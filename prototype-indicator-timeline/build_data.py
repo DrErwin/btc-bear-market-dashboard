@@ -500,6 +500,13 @@ def main() -> int:
     supply_loss_share = aligned_ratio(raw["supply_in_loss"], raw["supply"])
     rup = aligned_ratio(raw["unrealized_profit"], raw["market_cap"])
     rup_zscore = rolling_zscore(rup, 1460)
+    # Relative Unrealized Loss has no published Bitview stock series (only the profit
+    # stock exists); derive via the exact identity NUPL = RUP - RUL  <=>  RUL = RUP -
+    # NUPL, with NUPL = 1 - 1/MVRV (Unrealized P/L = Market Cap - Realized Cap).
+    # mvrv is computed above. Clipped at 0 to absorb rounding noise.
+    nupl = {day: 1.0 - 1.0 / value for day, value in mvrv.items() if value}
+    rul = {day: max(0.0, rup[day] - nupl[day]) for day in rup.keys() & nupl.keys()}
+    rul_zscore = rolling_zscore(rul, 1460)
     cvdd, cvdd_proximity = derive_cvdd(raw)
     sth_net = normalised_net(raw["sth_realized_profit_sum_24h"], raw["sth_realized_loss_sum_24h"], raw["market_cap"])
     lth_net = normalised_net(raw["lth_realized_profit_sum_24h"], raw["lth_realized_loss_sum_24h"], raw["market_cap"])
@@ -687,6 +694,24 @@ def main() -> int:
             "由本原型基于 RUP 计算", "自行计算", rup_zscore,
             [reference(-1.0, "低于均值1σ"), reference(-1.5, "低于均值1.5σ")], "below",
             caveat="这是明确版本化的4年滚动总体标准差，不冒充唯一官方RUP标准差。",
+        ),
+        metric(
+            "relative_unrealized_loss", "Relative Unrealized Loss", "percent",
+            "全网未实现亏损占市场价值的比例。底部 spike（投降）；跨周期峰值随市场成熟衰减。",
+            "Unrealized Loss / Market Cap (derived = RUP - (1 - 1/MVRV))",
+            "BRK / Bitview 基础日线", "自行计算（恒等式推导，Bitview 无未实现亏损存量序列）", rul,
+            [reference(0.4, "高未实现亏损参考"), reference(0.6, "深度投降观察线")], "above",
+            caveat="Bitview 无未实现亏损存量；按 NUPL=RUP−RUL、NUPL=1−1/MVRV 恒等式推导。"
+            "亏损侧振荡器，底部向上 spike（与 RUP 顶部 spike 镜像）。原始峰值跨周期衰减：2018底≈0.76、2022底≈0.66。",
+        ),
+        metric(
+            "relative_unrealized_loss_zscore_4y", "RUL 4年滚动 z-score", "zscore",
+            "Relative Unrealized Loss 相对过去1460日均值的标准差位置（底部 spike → 正向 z）。",
+            "(RUL - rolling mean 1460d) / rolling population std 1460d",
+            "由本原型基于 RUL（推导值）计算", "自行计算", rul_zscore,
+            [reference(2.0, "高于均值2σ（投降区）"), reference(2.5, "高于均值2.5σ（深度投降）")], "above",
+            caveat="RUL 强右偏（+1.67），单σ偏松；历史大底 z≈+2.8~+2.9、COVID≈+2.0。"
+            "这是明确版本化的4年滚动总体标准差，不冒充唯一官方RUL标准差。",
         ),
         metric(
             "cvdd_proximity", "CVDD 接近程度", "ratio",
