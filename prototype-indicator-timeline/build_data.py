@@ -549,6 +549,14 @@ def main() -> int:
     for _key in ("q5", "mean_1_5", "median_1_5"):
         print(f"  {_key:<12} MVRV={sth_levels[_key]:.5f}  -> price~${sth_levels[_key] * _latest_rp:,.0f}")
 
+    # --- aSOPR trailing-SMA secondary lines (causal / no-lookahead) ---
+    # Daily aSOPR is jagged (weekly cadence + one-off old-coin spends). A trailing
+    # SMA cleans the regime/trend view BUT erases the capitulation spike that LEADS
+    # the bottom (~10d). So raw stays primary -- the capitulation band fires on raw;
+    # these SMAs are trend/regime aides only. rolling_mean is causal ([day-W+1, day]).
+    asopr_3d = rolling_mean(raw["asopr_24h"], 3)
+    asopr_7d = rolling_mean(raw["asopr_24h"], 7)
+
     metrics = [
         metric(
             "mvrv", "MVRV", "ratio", "市场价值相对全市场已实现成本基础。", "Market Cap / Realized Cap",
@@ -605,7 +613,11 @@ def main() -> int:
             "asopr", "aSOPR", "ratio", "排除寿命不足一小时输出后的已花费盈亏倍数。",
             "Adjusted spent value at spend / value at creation", "BRK / Bitview", "公开成品日线", raw["asopr_24h"],
             [reference(1.0, "已实现盈亏平衡")], "below",
-            caveat="完整复算需要逐UTXO花费成本，本原型直接使用透明开源计算链的成品日线。",
+            extra_lines=[
+                ("sma_3d", "3日滞后均值（趋势辅助）", asopr_3d, "indicator"),
+                ("sma_7d", "7日滞后均值（趋势辅助）", asopr_7d, "indicator"),
+            ],
+            caveat="完整复算需要逐UTXO花费成本，本原型直接使用透明开源计算链的成品日线。原始日线为投降尖峰信号（触发线挂原始）；3d/7d为滞后均值（rolling_mean，无前视），仅作制度/趋势可读性辅助——会削平并滞后尖峰，不作触发。",
         ),
         metric(
             "hodler_npc_30d", "HODLer 投降卖出尖峰 · 占供应%", "percent",
