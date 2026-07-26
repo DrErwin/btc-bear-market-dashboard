@@ -549,6 +549,25 @@ def main() -> int:
     for _key in ("q5", "mean_1_5", "median_1_5"):
         print(f"  {_key:<12} MVRV={sth_levels[_key]:.5f}  -> price~${sth_levels[_key] * _latest_rp:,.0f}")
 
+    # --- Reserve Risk log z-score (cross-cycle normalization) ---
+    # RR = Price / HODL Bank; HODL Bank is a monotonic cumulative, so RR's
+    # absolute level drifts down ~0.4x per cycle (2013->2017->2021->2024 cycle
+    # peaks: 1.5e-4 -> 7.0e-5 -> 2.8e-5 -> 1.0e-5). Fixed absolute thresholds
+    # (Glassnode 0.002/0.0027) are permanently tripped this cycle, and the
+    # past-cycle quantile is biased low by the drift. log() turns the
+    # exponential decline linear; a trailing 4y (1460d) z-score then measures
+    # high/low vs RR's own recent cycle, so tops/bottoms land at comparable z
+    # across cycles. Thresholds are z-quantiles on the no-lookahead window.
+    rr = raw["reserve_risk"]
+    log_rr = {day: math.log(value) for day, value in rr.items() if value > 0}
+    rr_zscore = rolling_zscore(log_rr, 1460)
+    rr_z_q10 = past_cycle_quantile(rr_zscore, 0.10)
+    rr_z_q05 = past_cycle_quantile(rr_zscore, 0.05)
+    _latest_rr_z = rr_zscore[max(rr_zscore)]
+    print("Reserve Risk log z-score (trailing 4y, cross-cycle normalized):")
+    print(f"  current z = {_latest_rr_z:.3f}")
+    print(f"  past-cycle 10%ile z = {rr_z_q10:.3f}  |  5%ile z = {rr_z_q05:.3f}")
+
     # --- aSOPR trailing-SMA secondary lines (causal / no-lookahead) ---
     # Daily aSOPR is jagged (weekly cadence + one-off old-coin spends). A trailing
     # SMA cleans the regime/trend view BUT erases the capitulation spike that LEADS
@@ -706,7 +725,19 @@ def main() -> int:
             "价格相对HODL Bank的水平，结合长期持有信念与出售激励。",
             "Price / HODL Bank（BRK 实现）", "BRK / Bitview", "公开成品日线", raw["reserve_risk"],
             [reference(honest["reserve_risk_q10"], "过去周期10%分位（无前视）")], "below",
-            caveat="完整复算依赖VOCDD与HODL Bank历史状态，本原型绑定BRK公开实现。",
+            caveat="完整复算依赖VOCDD与HODL Bank历史状态，本原型绑定BRK公开实现。绝对值因 HODL Bank 累积每轮约 ×0.4 下移，固定阈值（如 0.002）在本轮永久失效；跨周期判断请用 reserve_risk_zscore。",
+        ),
+        metric(
+            "reserve_risk_zscore", "Reserve Risk · 周期归一化 z", "zscore",
+            "Reserve Risk 经 log + 4年滚动 z-score，消除分母 HODL Bank 累积导致的结构性下移，使各轮周期顶/底可比。",
+            "z[ log(Reserve Risk), trailing 1460d ]；阈值 = z 的过去周期分位（无前视）",
+            "BRK / Bitview", "自行计算（无前视）", rr_zscore,
+            [
+                reference(rr_z_q10, "z·过去周期10%分位（先触发）"),
+                reference(rr_z_q05, "z·过去周期5%分位（深部）"),
+                reference(0.0, "自身4年均值（中性）"),
+            ], "below",
+            caveat="Reserve Risk = Price / HODL Bank，分母 HODL Bank 为单调累积量，致绝对值每轮约 ×0.4 下移（2013→2024 周期顶 1.5e-4→1.0e-5），固定绝对阈值（如 0.002）在本轮永久失效。本指标对 log(RR) 取 trailing 4 年（1460d）z-score：把指数下移转线性后衡量相对本周期的高低，跨周期可比。z<0 = 低于自身4年均值；阈值用 z 的过去周期分位（无前视）。原始绝对值见 Reserve Risk 指标，切勿套 0.002。",
         ),
         metric(
             "seller_exhaustion", "Seller Exhaustion Constant", "small",
