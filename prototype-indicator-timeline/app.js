@@ -386,16 +386,6 @@ function buildChartOption(metric) {
     },
     itemStyle: { color: distributionMode ? line.color : (index === 0 ? COLORS.metric : COLORS.secondary[(index - 1) % COLORS.secondary.length]) },
     emphasis: { focus: "series" },
-    markLine: !distributionMode && index === 0 ? {
-      silent: false,
-      symbol: ["none", "none"],
-      label: { formatter: (params) => params.name, color: "#ffd0c4", fontSize: 10, position: "insideEndTop" },
-      lineStyle: { color: COLORS.reference, type: "dashed", width: 1.2 },
-      data: references.filter((item) => Number.isFinite(Number(item.value))).map((item) => ({
-        name: item.label || "参考线",
-        yAxis: Number(item.value),
-      })),
-    } : undefined,
   }));
   const entrySeries = {
     name: "阈值进入（30日冷却显示）",
@@ -411,6 +401,27 @@ function buildChartOption(metric) {
     },
     z: 8,
   };
+  const referenceSeries = (!distributionMode && references.length) ? {
+    name: "参考线",
+    type: "line",
+    yAxisIndex: 1,
+    data: [],
+    showSymbol: false,
+    animation: false,
+    silent: true,
+    tooltip: { show: false },
+    z: 5,
+    markLine: {
+      silent: true,
+      symbol: ["none", "none"],
+      label: { formatter: (params) => params.name, color: "#ffd0c4", fontSize: 10, position: "insideEndTop" },
+      lineStyle: { color: COLORS.reference, type: "dashed", width: 1.2 },
+      data: references.filter((item) => Number.isFinite(Number(item.value))).map((item) => ({
+        name: item.label || "参考线",
+        yAxis: Number(item.value),
+      })),
+    },
+  } : null;
   return {
     animation: false,
     color: [COLORS.price, COLORS.metric, ...COLORS.secondary],
@@ -468,7 +479,7 @@ function buildChartOption(metric) {
         textStyle: { color: "#7f8a93" },
       },
     ],
-    series: [priceSeries, ...indicatorSeries, entrySeries],
+    series: [priceSeries, ...indicatorSeries, entrySeries, referenceSeries].filter(Boolean),
   };
 }
 
