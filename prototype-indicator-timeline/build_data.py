@@ -167,6 +167,10 @@ def aligned_ratio(numerator: dict[date, float], denominator: dict[date, float]) 
     }
 
 
+def aligned_difference(left: dict[date, float], right: dict[date, float]) -> dict[date, float]:
+    return {day: left[day] - right[day] for day in left.keys() & right.keys()}
+
+
 def lag_change(values: dict[date, float], days: int, relative: bool) -> dict[date, float]:
     output: dict[date, float] = {}
     for day, value in values.items():
@@ -257,7 +261,9 @@ def derive_cvdd(raw: dict[str, dict[date, float]]) -> tuple[dict[date, float], d
         floor = running_value_destroyed / (age_days * 6_000_000.0)
         cvdd[day] = floor
         if price_value is not None and floor > 0:
-            proximity[day] = price_value / floor - 1.0
+            relative_distance = abs(price_value / floor - 1.0)
+            if relative_distance > 0:
+                proximity[day] = 1.0 / relative_distance
     return cvdd, proximity
 
 
@@ -498,6 +504,7 @@ def main() -> int:
     }
     psip = aligned_ratio(raw["supply_in_profit"], raw["supply"])
     supply_loss_share = aligned_ratio(raw["supply_in_loss"], raw["supply"])
+    sipl_gap = aligned_difference(psip, supply_loss_share)
     rup = aligned_ratio(raw["unrealized_profit"], raw["market_cap"])
     rup_zscore = rolling_zscore(rup, 1460)
     # Relative Unrealized Loss has no published Bitview stock series (only the profit
@@ -690,12 +697,15 @@ def main() -> int:
             check=compare(psip, raw["supply_in_profit_share_ratio"]),
         ),
         metric(
-            "sipl", "Supply in Profit / Loss", "percent", "盈利供应与亏损供应两条曲线的交错。",
-            "Profit Share = Supply in Profit / Supply; Loss Share = Supply in Loss / Supply",
+            "sipl", "Supply in Profit / Loss", "percent", "盈利供应、亏损供应，以及盈利占比减亏损占比的差值。",
+            "Profit Share = Supply in Profit / Supply; Loss Share = Supply in Loss / Supply; Gap = Profit Share - Loss Share",
             "BRK / Bitview 基础日线", "自行计算", psip,
-            [reference(0.5, "两线理论交错参考")], "below",
-            extra_lines=[("loss_share", "Supply in Loss", supply_loss_share, "indicator")],
-            caveat="与 PSIP 是同一底层供应盈亏事实的双线表达。",
+            [reference(0.5, "盈利/亏损占比平衡")], "below",
+            extra_lines=[
+                ("loss_share", "Supply in Loss", supply_loss_share, "indicator"),
+                ("profit_loss_gap", "盈利% − 亏损%", sipl_gap, "indicator"),
+            ],
+            caveat="与 PSIP 是同一底层供应盈亏事实的三线表达；差值大于零表示盈利供应占比更高。",
         ),
         metric(
             "relative_unrealized_profit", "Relative Unrealized Profit", "percent",
@@ -732,12 +742,12 @@ def main() -> int:
         ),
         metric(
             "cvdd_proximity", "CVDD 接近程度", "ratio",
-            "BTC价格相对固定600万常数CVDD价格地板的距离。",
-            "Price / [cumsum(CDD × Price) / (MarketAgeDays × 6,000,000)] - 1",
+            "BTC价格相对固定600万常数CVDD价格地板的接近程度；数值越大，代表越接近。",
+            "1 / abs(Price / [cumsum(CDD × Price) / (MarketAgeDays × 6,000,000)] - 1)",
             "BRK / Bitview Price 与 CDD 基础日线", "自行计算（Willy Woo 2019 固定常数版）", cvdd_proximity,
-            [reference(0.5, "高于CVDD 50%"), reference(0.0, "触及CVDD")], "below",
+            [reference(2.0, "距CVDD 50%（等价旧刻度0.5）")], "above",
             extra_lines=[("cvdd", "CVDD 价格地板", cvdd, "price")],
-            caveat="供应归一化CVDD是另一版本；本视图不混用。",
+            caveat="以相对距离的倒数表达，故越大越接近；价格恰好等于CVDD时倒数无定义，不写入该日。供应归一化CVDD是另一版本；本视图不混用。",
         ),
         metric(
             "lth_sth_normalized_net_realized_pnl", "LTH / STH Net Realized P/L", "percent",
