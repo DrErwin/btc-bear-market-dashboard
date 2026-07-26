@@ -356,6 +356,38 @@ def past_cycle_quantile(values: dict[date, float], probability: float) -> float:
     return quantile_list(sample, probability)
 
 
+def past_cycle_stats(values: dict[date, float]) -> dict[str, float]:
+    """Mean / population-std / median / MAD over the no-lookahead past-cycle window.
+
+    Same window convention as ``past_cycle_quantile`` ([ANCHOR, CURRENT_CYCLE_START],
+    with the <30 fallback), so the STH-MVRV tactical-price statistical methods are
+    computed on identical, lookahead-free data. Population std matches
+    ``rolling_zscore``'s basis; MAD is returned raw (callers scale by 1.4826 for a
+    sigma-equivalent).
+    """
+    sample = [value for day, value in values.items() if ANCHOR <= day <= CURRENT_CYCLE_START]
+    if len(sample) < 30:
+        sample = [value for day, value in values.items() if day >= ANCHOR]
+        print(
+            f"  warn: past-cycle sample too small for stats; "
+            f"using anchored full sample ({len(sample)} pts, includes current cycle)"
+        )
+    median = statistics.median(sample)
+    mad = statistics.median([abs(value - median) for value in sample])
+    return {
+        "mean": statistics.mean(sample),
+        "pstdev": statistics.pstdev(sample),
+        "median": median,
+        "mad": mad,
+    }
+
+
+def ladder(level: float, values: dict[date, float]) -> dict[date, float]:
+    """Scale a series by a constant -- turns an MVRV threshold into a price ladder
+    via Price = threshold x STH-RP."""
+    return {day: level * value for day, value in values.items()}
+
+
 def serialise(values: dict[date, float]) -> list[list]:
     return [[day.isoformat(), float(f"{value:.10g}")] for day, value in sorted(values.items())]
 
@@ -441,6 +473,18 @@ def main() -> int:
     rc_30d = lag_change(raw["realized_cap"], 30, True)
     sth_mvrv = derive_sth_mvrv(raw)
     hodler_npc = lag_change(raw["hodled_or_lost_supply"], 30, False)
+    hodler_npc_share = aligned_ratio(hodler_npc, raw["supply"])
+    # HODLer selling spikes (negative NPC) = capitulation at bear bottoms, but
+    # also distribution at bull tops. Gate to MVRV<1 to isolate bear capitulation
+    # (Glassnode LTH Capitulation Risk: MVRV<1 & SOPR<1). Deep-sell thresholds
+    # are no-lookahead past-cycle percentiles of the normalized NPC.
+    hodler_npc_capitulation = {
+        day: hodler_npc_share[day]
+        for day in hodler_npc_share
+        if day in mvrv and mvrv[day] < 1.0
+    }
+    hodler_deep_10 = past_cycle_quantile(hodler_npc_share, 0.10)
+    hodler_deep_5 = past_cycle_quantile(hodler_npc_share, 0.05)
     long_spent_share = aligned_ratio(obm_long, obm_total)
     # Old-coin spending is dual-natured: tops = profit-taking distribution,
     # bottoms = loss capitulation. Gate the share to MVRV<1 undervaluation days
@@ -487,6 +531,24 @@ def main() -> int:
         honest[key] = past_cycle_quantile(series, probability)
         print(f"  {key:<26} {old_value:>14.6g} -> {honest[key]:>14.6g}")
 
+    # --- STH-MVRV tactical-price levels (three statistical methods) ---
+    # Price = STH-MVRV x STH-RP, so an MVRV low-threshold x STH-RP(t) is a concrete
+    # buy-price ladder. Thresholds computed on the no-lookahead past-cycle window.
+    sth_rp = aligned_ratio(raw["sth_realized_cap"], raw["sth_supply"])
+    sth_stats = past_cycle_stats(sth_mvrv)
+    _sigma = sth_stats["pstdev"]
+    _mad_sigma = 1.4826 * sth_stats["mad"]
+    sth_levels = {
+        "q5": past_cycle_quantile(sth_mvrv, 0.05),
+        "mean_1_5": sth_stats["mean"] - 1.5 * _sigma,
+        "median_1_5": sth_stats["median"] - 1.5 * _mad_sigma,
+    }
+    sth_ladders = {key: ladder(level, sth_rp) for key, level in sth_levels.items()}
+    _latest_rp = sth_rp[max(sth_rp)]
+    print("STH-MVRV tactical-price levels (window [2018, 2022-bottom], no lookahead):")
+    for _key in ("q5", "mean_1_5", "median_1_5"):
+        print(f"  {_key:<12} MVRV={sth_levels[_key]:.5f}  -> price~${sth_levels[_key] * _latest_rp:,.0f}")
+
     metrics = [
         metric(
             "mvrv", "MVRV", "ratio", "市场价值相对全市场已实现成本基础。", "Market Cap / Realized Cap",
@@ -523,18 +585,40 @@ def main() -> int:
             check=compare(sth_mvrv, raw["sth_mvrv"]),
         ),
         metric(
+            "sth_mvrv_price", "STH-MVRV 战术价位（三法合并）", "ratio",
+            "STH-MVRV 三套统计抄底档合并：5%分位 / 1.5σ / 1.5·MAD；价位阶梯 = 档位 × STH-RP（Price = STH-MVRV × STH-RP）。",
+            "Q5 / (mean−1.5σ) / (median−1.5·1.4826·MAD)，各 × STH-RP；阈值在无前视窗口 [2018,2022底] 上算",
+            "BRK / Bitview 基础日线", "自行计算（无前视）", sth_mvrv,
+            [
+                reference(sth_levels["q5"], "5%分位（无前视）"),
+                reference(sth_levels["mean_1_5"], "1.5σ（无前视）"),
+                reference(sth_levels["median_1_5"], "1.5·MAD（无前视）"),
+            ], "below",
+            extra_lines=[
+                ("q5_price", "5%分位 × STH-RP", sth_ladders["q5"], "price"),
+                ("mean_1_5_price", "1.5σ × STH-RP", sth_ladders["mean_1_5"], "price"),
+                ("median_1_5_price", "1.5·MAD × STH-RP", sth_ladders["median_1_5"], "price"),
+            ],
+            caveat="三法对照：5%分位最浅(挂高先成交)、1.5σ居中偏浅(MVRV右偏致σ偏松)、1.5·MAD最深(抄深)。references[0]=5%分位为触发线。阈值无前视。",
+        ),
+        metric(
             "asopr", "aSOPR", "ratio", "排除寿命不足一小时输出后的已花费盈亏倍数。",
             "Adjusted spent value at spend / value at creation", "BRK / Bitview", "公开成品日线", raw["asopr_24h"],
             [reference(1.0, "已实现盈亏平衡")], "below",
             caveat="完整复算需要逐UTXO花费成本，本原型直接使用透明开源计算链的成品日线。",
         ),
         metric(
-            "hodler_npc_30d", "HODLer Net Position Change · 30d", "btc",
-            "HODLed or Lost Supply 的30日净变化（Glassnode LTH-NetPositionChange 口径，BTC 计）。",
-            "HODLedOrLostSupply(t) - HODLedOrLostSupply(t-30d)",
-            "BRK / Bitview 基础日线", "自行计算", hodler_npc,
-            [reference(0.0, "净积累/净释放分界")], "above",
-            caveat="保持 Glassnode 权威 BTC 口径；原固定 -50000 阈值在供应增长下非平稳已移除——跨周期比较按各轮周期自身尺度看，或另加供应归一化副线。",
+            "hodler_npc_30d", "HODLer 投降卖出尖峰 · 占供应%", "percent",
+            "HODLed or Lost Supply 的30日净积累占供应。负尖峰=大额卖出：牛市=派发、熊底=投降；用 MVRV<1 门控副线隔离熊市投降。",
+            "[HODLedOrLostSupply(t) − HODLedOrLostSupply(t−30d)] / Supply",
+            "BRK / Bitview 基础日线", "自行计算（% of supply）", hodler_npc_share,
+            [
+                reference(hodler_deep_10, "深卖阈值·10%分位（无前视）"),
+                reference(hodler_deep_5, "深卖阈值·5%分位（无前视）"),
+                reference(0.0, "积累/卖出分界"),
+            ], "below",
+            extra_lines=[("hodler_npc_capitulation", "低估期卖出（MVRV<1）", hodler_npc_capitulation, "indicator")],
+            caveat="投降是尖峰事件、不平滑。深卖阈值=过去周期[2018,2022底]NPC的5/10%分位（无前视）；副线只在 MVRV<1 显示=熊市投降（与 Glassnode LTH Capitulation Risk 同路）。原BTC口径=Glassnode LTH-NetPositionChange。",
         ),
         metric(
             "spent_value_ge155d_share", ">=155d 花费价值占比", "percent",
