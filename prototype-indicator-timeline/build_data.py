@@ -575,6 +575,23 @@ def main() -> int:
     print(f"  current z = {_latest_rr_z:.3f}")
     print(f"  past-cycle 10%ile z = {rr_z_q10:.3f}  |  5%ile z = {rr_z_q05:.3f}")
 
+    # --- Thermocap Multiple log z-score (relative-cycle view) ---
+    # Thermocap = MarketCap / cumulative subsidy. Unlike RR, structural drift
+    # here is mild: tops oscillate (2013/2017/2021 = 60/74/51) and the bottom
+    # slowly RISES (halvings slow the denominator, baseline mcap creeps up:
+    # 4.7 -> 5.7 -> 6.8). So z-score isn't fixing a severe monotonic decline
+    # (there isn't one) -- it removes the slow bottom creep and gives a
+    # "hot/cold vs its own 4y cycle" view. Absolute tops/bots (5-7 bot, 50-74
+    # top) stay valid; this is a supplementary relative-heat lens.
+    log_tc = {day: math.log(value) for day, value in thermocap_multiple.items() if value > 0}
+    tc_zscore = rolling_zscore(log_tc, 1460)
+    tc_z_q10 = past_cycle_quantile(tc_zscore, 0.10)
+    tc_z_q05 = past_cycle_quantile(tc_zscore, 0.05)
+    _latest_tc_z = tc_zscore[max(tc_zscore)]
+    print("Thermocap Multiple log z-score (trailing 4y, relative-cycle view):")
+    print(f"  current z = {_latest_tc_z:.3f}")
+    print(f"  past-cycle 10%ile z = {tc_z_q10:.3f}  |  5%ile z = {tc_z_q05:.3f}")
+
     # --- aSOPR trailing-SMA secondary lines (causal / no-lookahead) ---
     # Daily aSOPR is jagged (weekly cadence + one-off old-coin spends). A trailing
     # SMA cleans the regime/trend view BUT erases the capitulation spike that LEADS
@@ -776,8 +793,20 @@ def main() -> int:
             "市场价值相对累计矿工补贴美元价值的倍数。",
             "Market Cap / Subsidy Cumulative USD", "BRK / Bitview 基础日线", "自行计算", thermocap_multiple,
             [reference(honest["thermocap_q10"], "过去周期10%分位（无前视）")], "below",
-            caveat="历史熊底倍数会跨周期漂移；分位线基于过去周期、无前视。",
+            caveat="历史熊底倍数会跨周期漂移（顶部周期振荡、底部缓升）；分位线基于过去周期、无前视。相对周期的过热/过冷视角见 thermocap_multiple_zscore。",
             check=compare(thermocap_multiple, raw["thermo_cap_multiple"]),
+        ),
+        metric(
+            "thermocap_multiple_zscore", "Thermocap Multiple · 周期归一化 z", "zscore",
+            "Thermocap Multiple 经 log + 4年滚动 z-score，消除底部缓升、提供相对自身周期的过热/过冷视角。",
+            "z[ log(Thermocap Multiple), trailing 1460d ]；阈值 = z 的过去周期分位（无前视）",
+            "BRK / Bitview", "自行计算（无前视）", tc_zscore,
+            [
+                reference(tc_z_q10, "z·过去周期10%分位（先触发）"),
+                reference(tc_z_q05, "z·过去周期5%分位（深部）"),
+                reference(0.0, "自身4年均值（中性）"),
+            ], "below",
+            caveat="Thermocap = MarketCap / 累积矿工补贴。与 Reserve Risk 不同，本指标结构性下移轻微：顶部周期振荡（2013/2017/2021 = 60/74/51，2017 最高），底部反因减半放缓分母而缓升（4.7→5.7→6.8）。故 z-score 在此非修严重下移，而是消除底部缓升 + 提供“相对自身4年周期是否过热”的视角（绝对阈值底部5-7/顶部50-74仍有效）。z<0 = 低于自身4年均值；阈值用 z 的过去周期分位（无前视）。",
         ),
     ]
 
