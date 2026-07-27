@@ -1,0 +1,33 @@
+{
+  "analysis_date": "2026-07-26",
+  "stage": "深度压力期",
+  "consistency": "中等",
+  "summary": "估值压力和矿工压力已经出现，持有者行为还没有形成足够一致的确认。",
+  "compact": {
+    "support": {
+      "title": "估值压力出现",
+      "text": "估值与矿工类别提供了主要支撑，但还需要更多类别共同收敛。"
+    },
+    "obstacle": {
+      "title": "证据仍然分化",
+      "text": "持有者行为与资本流尚未完成从压力到确认的转换。"
+    },
+    "next": {
+      "title": "观察行为证据",
+      "text": "需要看到核心持有者行为与资本流同时改善。"
+    }
+  },
+  "categories": [
+    { "id": "valuation", "status": "充分确认", "note": "估值压力已经明显。" },
+    { "id": "supply", "status": "部分确认", "note": "供应盈亏结构偏向压力。" },
+    { "id": "capital", "status": "部分确认", "note": "资本流仍然偏弱。" },
+    { "id": "holders", "status": "部分确认", "note": "持有者行为仍需确认。" },
+    { "id": "miners", "status": "充分确认", "note": "矿工压力进入深度区间。" },
+    { "id": "anchors", "status": "部分确认", "note": "长期成本锚接近但未完全确认。" }
+  ],
+  "detailed": {
+    "supporting": "估值与矿工类别提供了主要支撑，MVRV、AVIV 与 Puell Multiple 进入项目设定的压力区。",
+    "contrary": "持有者行为、资本流和部分供应指标还没有形成足够一致的确认。",
+    "next_stage": "继续观察核心持有者行为与资本流是否共同增强。"
+  }
+}

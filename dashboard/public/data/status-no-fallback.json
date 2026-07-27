@@ -1,0 +1,5 @@
+{
+  "today_available": false,
+  "last_success_date": null,
+  "reason": "今日分析服务未返回可发布结果，且没有可用的上一份成功结果。"
+}

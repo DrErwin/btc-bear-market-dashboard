@@ -1,32 +1,17 @@
-# ---- Python ----
-__pycache__/
-*.py[cod]
-*$py.class
-*.so
-.Python
-venv/
-env/
-.venv/
-.env
+# This repository deliberately contains only the standalone web dashboard.
+# Keep local research, prototypes, services, test evidence, and tooling out of Git.
+/*
 
-# ---- Node / Web ----
-node_modules/
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
+# Files required to run and build the dashboard.
+!.gitignore
+!README.md
+!/dashboard/
+!/dashboard/**
 
-# ---- OS ----
-.DS_Store
-Thumbs.db
-desktop.ini
-
-# ---- Editors / IDE ----
-.vscode/
-.idea/
-*.swp
-*.swo
-*~
-
-# ---- Misc ----
-*.log
-.cache/
+# Generated or machine-local dashboard files.
+/dashboard/node_modules/
+/dashboard/dist/
+/dashboard/.vite/
+/dashboard/npm-debug.log*
+/dashboard/yarn-debug.log*
+/dashboard/yarn-error.log*

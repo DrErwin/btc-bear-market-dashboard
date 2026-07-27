@@ -1,0 +1,236 @@
+{
+  "price": [
+    { "date": "2025-09-01", "value": 102000 },
+    { "date": "2025-12-01", "value": 92000 },
+    { "date": "2026-02-01", "value": 81000 },
+    { "date": "2026-04-01", "value": 76000 },
+    { "date": "2026-06-01", "value": 70400 },
+    { "date": "2026-07-27", "value": 68420 }
+  ],
+  "metrics": {
+    "mvrv": {
+      "points": [
+        { "date": "2025-09-01", "value": 2.2 },
+        { "date": "2025-12-01", "value": 1.82 },
+        { "date": "2026-02-01", "value": 1.35 },
+        { "date": "2026-04-01", "value": 1.08 },
+        { "date": "2026-06-01", "value": 0.92 },
+        { "date": "2026-07-27", "value": 0.86 }
+      ],
+      "thresholds": [
+        { "value": 1, "direction": "below", "label": "成本平衡线", "meaning": "低于成本基础附近。" },
+        { "value": 0.8, "direction": "below", "label": "深度低估线", "meaning": "进入更深的估值压力区。" }
+      ]
+    },
+    "aviv": {
+      "points": [
+        { "date": "2025-09-01", "value": 1.6 },
+        { "date": "2025-12-01", "value": 1.22 },
+        { "date": "2026-02-01", "value": 0.94 },
+        { "date": "2026-04-01", "value": 0.76 },
+        { "date": "2026-06-01", "value": 0.62 },
+        { "date": "2026-07-27", "value": 0.54 }
+      ],
+      "thresholds": [
+        { "value": 0.75, "direction": "below", "label": "低估观察线", "meaning": "活跃投资者成本压力增加。" },
+        { "value": 0.55, "direction": "below", "label": "核心低估线", "meaning": "进入核心估值压力区。" }
+      ]
+    },
+    "sth-mvrv": {
+      "points": [
+        { "date": "2025-09-01", "value": 92000 },
+        { "date": "2025-12-01", "value": 85000 },
+        { "date": "2026-02-01", "value": 78000 },
+        { "date": "2026-04-01", "value": 73500 },
+        { "date": "2026-06-01", "value": 70000 },
+        { "date": "2026-07-27", "value": 68200 }
+      ],
+      "thresholds": [
+        { "value": 72000, "direction": "below", "label": "成本附近", "meaning": "价格回到短期持有者成本附近。" },
+        { "value": 65000, "direction": "below", "label": "压力加深线", "meaning": "价格进一步低于短期成本位置。" }
+      ]
+    },
+    "psip": {
+      "points": [
+        { "date": "2025-09-01", "value": 71 },
+        { "date": "2025-12-01", "value": 63 },
+        { "date": "2026-02-01", "value": 58 },
+        { "date": "2026-04-01", "value": 53 },
+        { "date": "2026-06-01", "value": 49 },
+        { "date": "2026-07-27", "value": 47.8 }
+      ],
+      "thresholds": [
+        { "value": 55, "direction": "below", "label": "盈利供应收缩线", "meaning": "盈利供应比例明显收窄。" },
+        { "value": 45, "direction": "below", "label": "低盈利供应线", "meaning": "盈利供应进入较低区间。" }
+      ]
+    },
+    "sipl": {
+      "points": [
+        { "date": "2025-09-01", "value": 29 },
+        { "date": "2025-12-01", "value": 37 },
+        { "date": "2026-02-01", "value": 42 },
+        { "date": "2026-04-01", "value": 47 },
+        { "date": "2026-06-01", "value": 51 },
+        { "date": "2026-07-27", "value": 52.2 }
+      ],
+      "thresholds": [
+        { "value": 50, "direction": "above", "label": "结构翻转线", "meaning": "亏损供应超过盈利供应。" },
+        { "value": 55, "direction": "above", "label": "亏损占优线", "meaning": "亏损供应占比较明显。" }
+      ]
+    },
+    "rup": {
+      "points": [
+        { "date": "2025-09-01", "value": 0.82 },
+        { "date": "2025-12-01", "value": 0.66 },
+        { "date": "2026-02-01", "value": 0.52 },
+        { "date": "2026-04-01", "value": 0.4 },
+        { "date": "2026-06-01", "value": 0.34 },
+        { "date": "2026-07-27", "value": 0.31 }
+      ],
+      "thresholds": [
+        { "value": 0.4, "direction": "below", "label": "利润压缩线", "meaning": "未实现利润空间收窄。" },
+        { "value": 0.25, "direction": "below", "label": "深度压缩线", "meaning": "利润空间进入较深压力区。" }
+      ]
+    },
+    "rul-z": {
+      "points": [
+        { "date": "2025-09-01", "value": 0.4 },
+        { "date": "2025-12-01", "value": -0.1 },
+        { "date": "2026-02-01", "value": -0.5 },
+        { "date": "2026-04-01", "value": -0.86 },
+        { "date": "2026-06-01", "value": -1.1 },
+        { "date": "2026-07-27", "value": -1.22 }
+      ],
+      "thresholds": [
+        { "value": -0.8, "direction": "below", "label": "压力观察线", "meaning": "进入滚动尺度压力区。" },
+        { "value": -1.5, "direction": "below", "label": "深度压力线", "meaning": "进入更深的周期压力区。" }
+      ]
+    },
+    "rc-npc": {
+      "points": [
+        { "date": "2025-09-01", "value": 2.4 },
+        { "date": "2025-12-01", "value": 1.2 },
+        { "date": "2026-02-01", "value": 0.4 },
+        { "date": "2026-04-01", "value": -0.1 },
+        { "date": "2026-06-01", "value": -0.45 },
+        { "date": "2026-07-27", "value": -0.6 }
+      ],
+      "thresholds": [
+        { "value": 0, "direction": "below", "label": "资本转弱线", "meaning": "三十日资本变化转为负值。" },
+        { "value": -1, "direction": "below", "label": "资本流出线", "meaning": "资本流动的压力进一步加深。" }
+      ]
+    },
+    "asopr": {
+      "points": [
+        { "date": "2025-09-01", "value": 1.08 },
+        { "date": "2025-12-01", "value": 1.04 },
+        { "date": "2026-02-01", "value": 1.02 },
+        { "date": "2026-04-01", "value": 0.99 },
+        { "date": "2026-06-01", "value": 0.97 },
+        { "date": "2026-07-27", "value": 0.97 }
+      ],
+      "thresholds": [
+        { "value": 1, "direction": "below", "label": "盈亏平衡线", "meaning": "花费行为低于盈亏平衡。" },
+        { "value": 0.95, "direction": "below", "label": "亏损实现线", "meaning": "花费行为进入较明显的亏损区。" }
+      ]
+    },
+    "hodler": {
+      "points": [
+        { "date": "2025-09-01", "value": -18000 },
+        { "date": "2025-12-01", "value": -9000 },
+        { "date": "2026-02-01", "value": -2500 },
+        { "date": "2026-04-01", "value": 2800 },
+        { "date": "2026-06-01", "value": 8900 },
+        { "date": "2026-07-27", "value": 12400 }
+      ],
+      "thresholds": [
+        { "value": 0, "direction": "above", "label": "行为转正线", "meaning": "长期持有供应开始净增加。" },
+        { "value": 10000, "direction": "above", "label": "重新积累线", "meaning": "长期持有供应出现明显净增加。" }
+      ]
+    },
+    "spent155": {
+      "points": [
+        { "date": "2025-09-01", "value": 9 },
+        { "date": "2025-12-01", "value": 11 },
+        { "date": "2026-02-01", "value": 13 },
+        { "date": "2026-04-01", "value": 16 },
+        { "date": "2026-06-01", "value": 18 },
+        { "date": "2026-07-27", "value": 19.8 }
+      ],
+      "thresholds": [
+        { "value": 15, "direction": "above", "label": "老币活动线", "meaning": "老币花费占比开始抬升。" },
+        { "value": 22, "direction": "above", "label": "投降增强线", "meaning": "老币花费占比进入更高区间。" }
+      ]
+    },
+    "seller": {
+      "points": [
+        { "date": "2025-09-01", "value": 0.82 },
+        { "date": "2025-12-01", "value": 0.7 },
+        { "date": "2026-02-01", "value": 0.61 },
+        { "date": "2026-04-01", "value": 0.54 },
+        { "date": "2026-06-01", "value": 0.46 },
+        { "date": "2026-07-27", "value": 0.42 }
+      ],
+      "thresholds": [
+        { "value": 0.5, "direction": "below", "label": "耗竭观察线", "meaning": "卖方压力开始接近耗竭观察区。" },
+        { "value": 0.35, "direction": "below", "label": "深度耗竭线", "meaning": "卖方压力进入更深的耗竭区。" }
+      ]
+    },
+    "puell": {
+      "points": [
+        { "date": "2025-09-01", "value": 1.5 },
+        { "date": "2025-12-01", "value": 1.12 },
+        { "date": "2026-02-01", "value": 0.83 },
+        { "date": "2026-04-01", "value": 0.63 },
+        { "date": "2026-06-01", "value": 0.51 },
+        { "date": "2026-07-27", "value": 0.46 }
+      ],
+      "thresholds": [
+        { "value": 0.6, "direction": "below", "label": "矿工压力线", "meaning": "矿工收入低于历史常态。" },
+        { "value": 0.4, "direction": "below", "label": "深度压力线", "meaning": "矿工经济压力进一步加深。" }
+      ]
+    },
+    "thermo": {
+      "points": [
+        { "date": "2025-09-01", "value": 0.72 },
+        { "date": "2025-12-01", "value": 0.2 },
+        { "date": "2026-02-01", "value": -0.35 },
+        { "date": "2026-04-01", "value": -0.8 },
+        { "date": "2026-06-01", "value": -1.22 },
+        { "date": "2026-07-27", "value": -1.36 }
+      ],
+      "thresholds": [
+        { "value": -1, "direction": "below", "label": "周期低位线", "meaning": "进入周期归一化的低位区。" },
+        { "value": -1.5, "direction": "below", "label": "深度低位线", "meaning": "进入更深的周期低位区。" }
+      ]
+    },
+    "cvdd": {
+      "points": [
+        { "date": "2025-09-01", "value": 1.32 },
+        { "date": "2025-12-01", "value": 1.16 },
+        { "date": "2026-02-01", "value": 1.02 },
+        { "date": "2026-04-01", "value": 0.95 },
+        { "date": "2026-06-01", "value": 0.88 },
+        { "date": "2026-07-27", "value": 0.83 }
+      ],
+      "thresholds": [
+        { "value": 0.9, "direction": "below", "label": "成本锚附近", "meaning": "价格与长期成本锚的距离收窄。" },
+        { "value": 0.75, "direction": "below", "label": "深度接近线", "meaning": "价格进一步靠近长期成本锚。" }
+      ]
+    },
+    "reserve": {
+      "points": [
+        { "date": "2025-09-01", "value": 0.82 },
+        { "date": "2025-12-01", "value": 0.3 },
+        { "date": "2026-02-01", "value": -0.32 },
+        { "date": "2026-04-01", "value": -0.81 },
+        { "date": "2026-06-01", "value": -1.25 },
+        { "date": "2026-07-27", "value": -1.42 }
+      ],
+      "thresholds": [
+        { "value": -1, "direction": "below", "label": "信念高位线", "meaning": "长期持有信念进入周期高位。" },
+        { "value": -1.5, "direction": "below", "label": "深度信念线", "meaning": "长期持有信念处于更深的周期高位。" }
+      ]
+    }
+  }
+}
