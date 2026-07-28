@@ -115,6 +115,16 @@ def test_rejects_numeric_probability_and_trading_advice(forbidden_text: str) -> 
     assert_rejected(payload)
 
 
+def test_forbidden_word_feedback_names_the_exact_term() -> None:
+    payload = load_analysis()
+    payload["detailed"]["supporting"] = "建议买入"
+
+    with pytest.raises(InvalidAnalysisError) as exc_info:
+        validate_analysis(payload)
+
+    assert any("买入" in error for error in exc_info.value.errors)
+
+
 def test_rejects_forbidden_advice_field_even_when_nested() -> None:
     payload = load_analysis()
     payload["detailed"]["extra"] = {"position": "50%"}

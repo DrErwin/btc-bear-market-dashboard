@@ -61,7 +61,7 @@
 - `input_builder.py`：从 snapshot 白名单取字段，剥离 series/来源/历史，只发可公开归纳的指标事实；图表中性参考线不发送给 AI，避免被误算为触发阈值。
 - `validator.py`：拒绝禁止措辞（买卖/概率/杠杆等）、未知词汇、缺字段。
 - `semantic_validator.py`：把 AI 文案重新对照本次阈值输入；未触发指标不得进入支持证据，零触发类别不得标为已确认，并拒绝 Reserve Risk 与 HODLer 零线的已知语义反转。
-- `provider.py`：OpenAI 兼容 chat 调用（默认 GLM-5.2，开启深度思考并使用增强推理强度）；单次等待 5 分钟，临时调用失败或首次输出不合规时自动重试一次，第二次仍失败才返回 `(None, reason)` 触发回退。
+- `provider.py`：OpenAI 兼容 chat 调用（默认 GLM-5.2，开启深度思考并使用增强推理强度）；单次等待 5 分钟，临时调用失败或输出不合规时最多重试两次，第三次仍失败才返回 `(None, reason)` 触发回退。禁词校验会把具体命中词反馈给模型重写。
 
 **主链路** `services/run_daily.py`：抓取 → 新鲜度检查 → 派生 → AI → 校验 → 组装 → 归档上一份 → 原子发布 → 追加 `artifacts/run-log.jsonl` 审计日志。
 

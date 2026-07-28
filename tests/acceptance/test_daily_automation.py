@@ -115,14 +115,16 @@ def test_rc_npc_threshold_meaning_matches_its_configured_direction() -> None:
     )
 
 
-def test_invalid_ai_wording_is_rewritten_once_before_fallback(
+def test_invalid_ai_wording_can_be_rewritten_twice_before_fallback(
     monkeypatch,
 ) -> None:
     packet = json.loads(PACKET_PATH.read_text(encoding="utf-8"))
     visible_analysis = build_valid_analysis(packet)
-    invalid = copy.deepcopy(visible_analysis)
-    invalid["detailed"]["contrary"] = "建议买入"
-    responses = [invalid, visible_analysis]
+    first_invalid = copy.deepcopy(visible_analysis)
+    first_invalid["detailed"]["contrary"] = "建议买入"
+    second_invalid = copy.deepcopy(visible_analysis)
+    second_invalid["detailed"]["next_stage"] = "建议卖出"
+    responses = [first_invalid, second_invalid, visible_analysis]
     requests: list[dict] = []
 
     class FakeResponse:
@@ -166,8 +168,10 @@ def test_invalid_ai_wording_is_rewritten_once_before_fallback(
 
     assert reason is None
     assert analysis == visible_analysis
-    assert len(requests) == 2
+    assert len(requests) == 3
     assert "上一份输出未通过校验" in requests[1]["messages"][1]["content"]
+    assert "买入" in requests[1]["messages"][1]["content"]
+    assert "卖出" in requests[2]["messages"][1]["content"]
 
 
 def test_transient_ai_timeout_is_retried_once(

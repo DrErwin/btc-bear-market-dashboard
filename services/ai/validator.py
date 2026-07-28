@@ -119,8 +119,14 @@ def _scan_forbidden(value: object, path: str, errors: list[str]) -> None:
         for index, child in enumerate(value):
             _scan_forbidden(child, f"{path}[{index}]", errors)
     elif isinstance(value, str):
-        if _FORBIDDEN_TEXT_RE.search(value) or _NUMERIC_PROBABILITY_RE.search(value):
-            errors.append(f"{path} 含有禁止的概率或交易建议措辞")
+        matches = [
+            match.group(0)
+            for pattern in (_FORBIDDEN_TEXT_RE, _NUMERIC_PROBABILITY_RE)
+            if (match := pattern.search(value))
+        ]
+        if matches:
+            terms = "、".join(dict.fromkeys(matches))
+            errors.append(f"{path} 含有禁止措辞：{terms}")
 
 
 def _check_container_keys(payload: Mapping[str, Any], errors: list[str]) -> None:

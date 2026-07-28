@@ -211,7 +211,7 @@ def call_ai(
 
     validation_feedback: str | None = None
     last_call_error: str | None = None
-    for attempt in range(2):
+    for attempt in range(3):
         try:
             raw = _chat(
                 ai_input,
@@ -233,7 +233,7 @@ def call_ai(
             last_call_error = (
                 f"AI 调用失败: {type(exc).__name__}: {str(exc)[:120]}"
             )
-            if attempt == 0:
+            if attempt < 2:
                 continue
             return None, last_call_error
 
@@ -241,7 +241,7 @@ def call_ai(
             validator.validate_analysis(raw)
             semantic_validator.validate_analysis_semantics(raw, ai_input)
         except validator.InvalidAnalysisError as exc:
-            if attempt == 0:
+            if attempt < 2:
                 validation_feedback = "；".join(exc.errors[:3])
                 continue
             return None, f"AI 输出契约校验失败: {exc.errors[:3]}"
