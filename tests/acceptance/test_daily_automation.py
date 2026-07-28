@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import copy
 import json
 import subprocess
 from pathlib import Path
@@ -38,6 +39,7 @@ def test_optional_ai_environment_values_can_be_blank(
     monkeypatch,
 ) -> None:
     packet = json.loads(PACKET_PATH.read_text(encoding="utf-8"))
+    visible_analysis = packet["analysis"] or packet["fallback"]
     captured: dict[str, object] = {}
 
     class FakeResponse:
@@ -52,9 +54,9 @@ def test_optional_ai_environment_values_can_be_blank(
                 "choices": [
                     {
                         "message": {
-                            "content": json.dumps(
-                                packet["analysis"], ensure_ascii=False
-                            )
+                                "content": json.dumps(
+                                    visible_analysis, ensure_ascii=False
+                                )
                         }
                     }
                 ]
@@ -91,6 +93,7 @@ def test_optional_ai_environment_values_can_be_blank(
     assert "只有触发阈值的指标才能列入支持证据" in user_prompt
     assert "未触发的指标只能列入阻碍、反面证据或待确认条件" in user_prompt
     assert "核心或辅助是指标角色，不是类别角色" in user_prompt
+    assert "即使是否定句或风险提示，也不要复述任何禁止词" in user_prompt
 
 
 def test_rc_npc_threshold_meaning_matches_its_configured_direction() -> None:
@@ -99,6 +102,61 @@ def test_rc_npc_threshold_meaning_matches_its_configured_direction() -> None:
     assert rc_npc.thresholds[0]["meaning"] == (
         "三十日已实现资本变化由收缩转为扩张。"
     )
+
+
+def test_invalid_ai_wording_is_rewritten_once_before_fallback(
+    monkeypatch,
+) -> None:
+    packet = json.loads(PACKET_PATH.read_text(encoding="utf-8"))
+    visible_analysis = packet["analysis"] or packet["fallback"]
+    invalid = copy.deepcopy(visible_analysis)
+    invalid["detailed"]["contrary"] = "建议买入"
+    responses = [invalid, visible_analysis]
+    requests: list[dict] = []
+
+    class FakeResponse:
+        def __init__(self, analysis: dict):
+            self.analysis = analysis
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            return False
+
+        def read(self) -> bytes:
+            response = {
+                "choices": [
+                    {
+                        "message": {
+                            "content": json.dumps(
+                                self.analysis, ensure_ascii=False
+                            )
+                        }
+                    }
+                ]
+            }
+            return json.dumps(response, ensure_ascii=False).encode("utf-8")
+
+    def fake_urlopen(request, timeout):
+        requests.append(json.loads(request.data))
+        return FakeResponse(responses.pop(0))
+
+    monkeypatch.setenv("AI_API_KEY", "test-only-key")
+    monkeypatch.delenv("AI_BASE_URL", raising=False)
+    monkeypatch.delenv("AI_MODEL", raising=False)
+    monkeypatch.setattr(provider, "urlopen", fake_urlopen)
+
+    analysis, reason = provider.call_ai(
+        packet["snapshot"],
+        data_date=packet["data_date"],
+        mock=False,
+    )
+
+    assert reason is None
+    assert analysis == visible_analysis
+    assert len(requests) == 2
+    assert "上一份输出未通过校验" in requests[1]["messages"][1]["content"]
 
 
 def test_daily_audit_log_is_not_ignored_by_git() -> None:

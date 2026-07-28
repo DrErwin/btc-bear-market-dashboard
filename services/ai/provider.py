@@ -44,7 +44,17 @@ _SYSTEM_PROMPT = (
 )
 
 
-def _user_prompt(ai_input: dict, data_date: str) -> str:
+def _user_prompt(
+    ai_input: dict,
+    data_date: str,
+    validation_feedback: str | None = None,
+) -> str:
+    correction = ""
+    if validation_feedback:
+        correction = (
+            "\n上一份输出未通过校验，请重新生成完整 JSON。"
+            f"校验原因：{validation_feedback}。不要解释错误，只输出修正后的完整对象。\n"
+        )
     return (
         f"分析日期 analysis_date = {data_date}。\n"
         f"阶段只能从这些里选一个 stage：{list(ALLOWED_STAGES)}。\n"
@@ -55,6 +65,8 @@ def _user_prompt(ai_input: dict, data_date: str) -> str:
         "只有触发阈值的指标才能列入支持证据；未触发的指标只能列入阻碍、反面证据或待确认条件，"
         "不能因为数值看起来偏高、偏低、为正或为负就自行改变阈值方向。\n"
         "核心或辅助是指标角色，不是类别角色；不要把类别称为核心类别或辅助类别，也不要把包含核心指标的类别概括为辅助类别。\n\n"
+        "即使是否定句或风险提示，也不要复述任何禁止词；只描述证据、阶段和待确认条件。\n"
+        f"{correction}\n"
         "输出 JSON 结构（不要输出任何 JSON 以外的文字）：\n"
         "{\n"
         '  "analysis_date": "<上面给的分析日期>",\n'
@@ -81,12 +93,26 @@ def _user_prompt(ai_input: dict, data_date: str) -> str:
     )
 
 
-def _chat(ai_input: dict, data_date: str, api_key: str, base_url: str, model: str) -> dict:
+def _chat(
+    ai_input: dict,
+    data_date: str,
+    api_key: str,
+    base_url: str,
+    model: str,
+    validation_feedback: str | None = None,
+) -> dict:
     body = json.dumps({
         "model": model,
         "messages": [
             {"role": "system", "content": _SYSTEM_PROMPT},
-            {"role": "user", "content": _user_prompt(ai_input, data_date)},
+            {
+                "role": "user",
+                "content": _user_prompt(
+                    ai_input,
+                    data_date,
+                    validation_feedback,
+                ),
+            },
         ],
         "response_format": {"type": "json_object"},
         "thinking": {"type": "enabled"},
@@ -169,13 +195,39 @@ def call_ai(
 
     try:
         ai_input = build_ai_input(snapshot)
-        raw = _chat(ai_input, data_date, api_key, base_url, model)
-    except (HTTPError, URLError, TimeoutError, ConnectionError, OSError, KeyError, ValueError) as exc:
+    except (OSError, KeyError, ValueError) as exc:
         return None, f"AI 调用失败: {type(exc).__name__}: {str(exc)[:120]}"
 
-    try:
-        validator.validate_analysis(raw)
-    except validator.InvalidAnalysisError as exc:
-        return None, f"AI 输出契约校验失败: {exc.errors[:3]}"
+    validation_feedback: str | None = None
+    for attempt in range(2):
+        try:
+            raw = _chat(
+                ai_input,
+                data_date,
+                api_key,
+                base_url,
+                model,
+                validation_feedback,
+            )
+        except (
+            HTTPError,
+            URLError,
+            TimeoutError,
+            ConnectionError,
+            OSError,
+            KeyError,
+            ValueError,
+        ) as exc:
+            return None, f"AI 调用失败: {type(exc).__name__}: {str(exc)[:120]}"
 
-    return raw, None
+        try:
+            validator.validate_analysis(raw)
+        except validator.InvalidAnalysisError as exc:
+            if attempt == 0:
+                validation_feedback = "；".join(exc.errors[:3])
+                continue
+            return None, f"AI 输出契约校验失败: {exc.errors[:3]}"
+
+        return raw, None
+
+    return None, "AI 输出契约校验失败: 重试后仍不可用"

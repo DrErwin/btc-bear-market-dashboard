@@ -60,7 +60,7 @@
 - `contract.py`：固定阶段/类别/状态/一致性词汇表 + JSON schema。
 - `input_builder.py`：从 snapshot 白名单取字段，剥离 series/来源/历史，只发可公开归纳的指标事实。
 - `validator.py`：拒绝禁止措辞（买卖/概率/杠杆等）、未知词汇、缺字段。
-- `provider.py`：OpenAI 兼容 chat 调用（默认 GLM-5.2，开启深度思考并使用最高推理强度），所有失败返回 `(None, reason)` 触发回退。
+- `provider.py`：OpenAI 兼容 chat 调用（默认 GLM-5.2，开启深度思考并使用最高推理强度）；首次输出不合规时携带校验原因自动重写一次，第二次仍失败才返回 `(None, reason)` 触发回退。
 
 **主链路** `services/run_daily.py`：抓取 → 新鲜度检查 → 派生 → AI → 校验 → 组装 → 归档上一份 → 原子发布 → 追加 `artifacts/run-log.jsonl` 审计日志。
 

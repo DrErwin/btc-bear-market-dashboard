@@ -16,7 +16,7 @@ PACKET_PATH = ROOT / "dashboard" / "public" / "data" / "packet.json"
 
 def load_analysis() -> dict:
     packet = json.loads(PACKET_PATH.read_text(encoding="utf-8"))
-    return packet["analysis"]
+    return packet["analysis"] or packet["fallback"]
 
 
 def load_packet() -> dict:
@@ -42,9 +42,10 @@ def test_current_offline_analysis_matches_the_ai_contract() -> None:
 def test_visible_analysis_never_fully_confirms_an_untriggered_category() -> None:
     """A category label must not contradict every visible metric card."""
     packet = load_packet()
+    visible_analysis = packet["analysis"] or packet["fallback"]
     analysis_by_category = {
         item["id"]: item["status"]
-        for item in packet["analysis"]["categories"]
+        for item in visible_analysis["categories"]
     }
 
     for category in packet["snapshot"]["categories"]:

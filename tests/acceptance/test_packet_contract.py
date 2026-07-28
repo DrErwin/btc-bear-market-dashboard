@@ -31,7 +31,18 @@ PACKET_PATH = ROOT / "dashboard" / "public" / "data" / "packet.json"
 
 @pytest.fixture(scope="session")
 def good_packet() -> dict:
-    return json.loads(PACKET_PATH.read_text(encoding="utf-8"))
+    packet_data = json.loads(PACKET_PATH.read_text(encoding="utf-8"))
+    if packet_data["analysis"] is None:
+        # The public packet may legitimately be in whole-packet fallback mode.
+        # Contract mutation tests need a canonical success packet regardless of
+        # today's provider state, so promote the visible fallback in-memory.
+        packet_data["analysis"] = copy.deepcopy(packet_data["fallback"])
+        packet_data["status"] = {
+            "today_available": True,
+            "last_success_date": packet_data["analysis"]["analysis_date"],
+            "reason": None,
+        }
+    return packet_data
 
 
 @pytest.fixture
