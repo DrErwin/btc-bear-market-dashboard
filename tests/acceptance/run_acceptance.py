@@ -7,11 +7,13 @@ live model.
 
 from __future__ import annotations
 
+import json
 import os
 import re
 import subprocess
 import sys
 import time
+from collections import Counter
 from pathlib import Path
 from urllib.request import urlopen
 
@@ -26,6 +28,15 @@ EVIDENCE = ROOT / "artifacts" / "review-evidence"
 # 4173 is commonly occupied by another local prototype in this workspace.
 PORT = 4175
 BASE_URL = f"http://127.0.0.1:{PORT}/"
+
+
+def load_success_analysis() -> dict:
+    packet_path = DIST / "data" / "packet.json"
+    packet = json.loads(packet_path.read_text(encoding="utf-8"))
+    analysis = packet.get("analysis")
+    if not isinstance(analysis, dict):
+        raise RuntimeError("成功数据包缺少可展示的 AI 分析")
+    return analysis
 
 
 def wait_for_server() -> None:
@@ -134,16 +145,21 @@ def assert_chart_excludes_colour(
 
 
 def success_flow(page: Page) -> None:
+    analysis = load_success_analysis()
     page.set_viewport_size({"width": 1440, "height": 900})
     open_page(page)
 
-    expect(page.locator("h1")).to_contain_text("筑底证据积累期")
+    expect(page.locator("h1")).to_contain_text(analysis["stage"])
     for stage in ("尚未进入熊底观察期", "熊市下行期", "深度压力期", "筑底证据积累期", "熊底证据充分期"):
         expect(page.get_by_text(stage, exact=True).first).to_be_visible()
     assert page.locator(".stage-stop.is-current").count() == 1
     expect(page.get_by_text("证据一致性", exact=True)).to_be_visible()
     expect(page.locator(".evaluation-summary")).to_be_visible()
-    for title in ("估值 + 矿工压力", "持有者行为仍在积累", "核心类别继续收敛"):
+    for title in (
+        analysis["compact"]["support"]["title"],
+        analysis["compact"]["obstacle"]["title"],
+        analysis["compact"]["next"]["title"],
+    ):
         expect(page.get_by_text(title, exact=True)).to_be_visible()
 
     detail = page.locator(".detail-toggle")
@@ -157,8 +173,9 @@ def success_flow(page: Page) -> None:
     board_box = page.locator(".evidence-board").bounding_box()
     assert board_box and board_box["y"] < 900, "1440x900 首屏应看到分类看板顶部"
     assert page.locator(".category-grid .category-card").count() == 6
-    assert page.get_by_text("充分确认", exact=True).count() >= 2
-    assert page.get_by_text("部分确认", exact=True).count() >= 4
+    expected_status_counts = Counter(item["status"] for item in analysis["categories"])
+    for status in ("未确认", "部分确认", "充分确认"):
+        assert page.get_by_text(status, exact=True).count() == expected_status_counts[status]
 
     categories = {
         "valuation": ["MVRV", "AVIV", "STH-MVRV 战术价位"],

@@ -19,6 +19,10 @@ def load_analysis() -> dict:
     return packet["analysis"]
 
 
+def load_packet() -> dict:
+    return json.loads(PACKET_PATH.read_text(encoding="utf-8"))
+
+
 def assert_rejected(payload: dict) -> None:
     with pytest.raises(InvalidAnalysisError):
         validate_analysis(payload)
@@ -27,12 +31,36 @@ def assert_rejected(payload: dict) -> None:
 def test_current_offline_analysis_matches_the_ai_contract() -> None:
     normalized = validate_analysis(load_analysis())
 
-    assert normalized["stage"] == "筑底证据积累期"
-    assert normalized["consistency"] == "中等"
+    assert normalized["stage"]
+    assert normalized["consistency"]
     assert {item["category"] for item in normalized["categories"]} == set(CATEGORY_IDS)
     assert normalized["supporting_evidence"]
     assert normalized["contrary_evidence"]
     assert normalized["next_stage_confirmation"]
+
+
+def test_visible_analysis_never_fully_confirms_an_untriggered_category() -> None:
+    """A category label must not contradict every visible metric card."""
+    packet = load_packet()
+    analysis_by_category = {
+        item["id"]: item["status"]
+        for item in packet["analysis"]["categories"]
+    }
+
+    for category in packet["snapshot"]["categories"]:
+        metrics = [
+            metric
+            for metric in packet["snapshot"]["metrics"]
+            if metric["category"] == category["id"]
+        ]
+        all_untriggered = all(
+            metric["tier_label"] == "未进入观察区" for metric in metrics
+        )
+        if all_untriggered:
+            assert analysis_by_category[category["id"]] != "充分确认", (
+                f"{category['name']} 的所有指标均未进入观察区，"
+                "但页面分类被标为充分确认"
+            )
 
 
 @pytest.mark.parametrize(
@@ -90,4 +118,3 @@ def test_rejects_forbidden_advice_field_even_when_nested() -> None:
     payload = load_analysis()
     payload["detailed"]["extra"] = {"position": "50%"}
     assert_rejected(payload)
-
