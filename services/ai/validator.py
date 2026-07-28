@@ -119,7 +119,9 @@ INTERNAL_OUTPUT_TERMS = (
 )
 _FORBIDDEN_TEXT_RE = re.compile(
     r"买入|买卖|做多|做空|抄底|入场(?:价|价格)?|仓位|持仓|杠杆|概率|"
-    r"(?:建议|应该|可以|适合|考虑|立即|现在)\s*卖出|卖出建议|"
+    r"(?<!亏损)卖出|"
+    r"(?:建议|应该|可以|适合|考虑|立即|现在|逢高|逢低|止损|止盈).{0,8}亏损卖出|"
+    r"卖出建议|"
     r"\b(?:buy|sell|long|short|leverage|probability|confidence_pct|position(?:\s+size)?|entry\s+price)\b",
     re.IGNORECASE,
 )

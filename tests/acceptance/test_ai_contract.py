@@ -143,6 +143,8 @@ def test_rejects_missing_required_detail(detail_field: str) -> None:
         "熊底概率为 78%",
         "建议买入并提高仓位",
         "建议卖出",
+        "卖出 BTC",
+        "逢高卖出 BTC",
         "使用 3 倍杠杆",
     ],
 )

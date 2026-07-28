@@ -173,7 +173,9 @@ def _metric_evidence_inputs(
         if status not in _STATUS_TEXT:
             raise ValueError(f"指标 {metric_id} 使用未知数据状态: {status}")
 
-        current_value = state.get("current_value")
+        current_value = (
+            None if status == "missing" else state.get("current_value")
+        )
         threshold_inputs: list[dict[str, object]] = []
         raw_thresholds = raw_metric.get("thresholds")
         if not isinstance(raw_thresholds, list):

@@ -102,6 +102,25 @@ def test_validator_can_enforce_machine_stage_range_and_pressure_summary() -> Non
     assert normalized["pressure_summary"]
 
 
+def test_missing_metric_value_is_removed_from_ai_input() -> None:
+    snapshot = make_snapshot()
+    mvrv = next(metric for metric in snapshot["metrics"] if metric["id"] == "mvrv")
+    mvrv["current_date"] = None
+    brief = compile_evidence(snapshot)
+
+    request = build_evidence_input(snapshot, evidence_brief=brief)
+    ai_mvrv = next(
+        metric for metric in request["metric_states"] if metric["id"] == "mvrv"
+    )
+
+    assert ai_mvrv["status"] == "缺失，不参与判断"
+    assert ai_mvrv["value"] is None
+    assert all(
+        threshold["triggered"] is None
+        for threshold in ai_mvrv["thresholds"]
+    )
+
+
 def test_semantic_validator_requires_pressure_summary_for_strong_auxiliary() -> None:
     snapshot = make_snapshot(aux_values={"rul-z": 2.7, "asopr": 0.9, "seller": 0.05})
     brief = compile_evidence(snapshot)

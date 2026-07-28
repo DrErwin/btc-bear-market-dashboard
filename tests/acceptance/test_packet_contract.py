@@ -27,6 +27,9 @@ from services.data.packet import PacketValidationError  # noqa: E402
 
 
 PACKET_PATH = ROOT / "dashboard" / "public" / "data" / "packet.json"
+FAILURE_PACKET_PATH = (
+    ROOT / "dashboard" / "public" / "data" / "packet-failure.json"
+)
 
 
 @pytest.fixture(scope="session")
@@ -180,6 +183,16 @@ def test_failure_packet_keeps_previous_analysis(good: dict) -> None:
     assert fail["analysis"] is None
     assert fail["fallback"]["stage"] == previous_analysis["stage"]
     assert fail["status"]["last_success_date"] == previous_date
+
+
+def test_checked_in_failure_packet_uses_one_coherent_previous_success() -> None:
+    failure = json.loads(FAILURE_PACKET_PATH.read_text(encoding="utf-8"))
+    fallback = failure["fallback"]
+
+    assert failure["analysis"] is None
+    assert fallback["analysis_date"] == failure["analysis_date"]
+    assert fallback["analysis_date"] == failure["status"]["last_success_date"]
+    assert fallback.get("pressure_summary")
 
 
 # --- Requirement 4: provider failure modes all return (None, reason) ---

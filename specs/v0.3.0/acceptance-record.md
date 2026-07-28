@@ -20,7 +20,7 @@
 
 | 入口 | 结果 |
 |---|---|
-| `python -m pytest tests/acceptance -q` | `104 passed` |
+| `python -m pytest tests/acceptance -q` | `108 passed` |
 | `cd dashboard; npm run build` | TypeScript 检查与 Vite 构建通过；仅有既有 bundle 大小警告 |
 | `python tests/acceptance/run_acceptance.py` | `ACCEPTANCE PASS`；构建、离线契约、Playwright 桌面/移动检查全部通过 |
 | `python scripts/test_packet.py` | 真实数据抓取、v0.3 数据包组装、原子写入和日期契约通过 |
