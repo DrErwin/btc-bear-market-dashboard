@@ -36,6 +36,27 @@ const analysis = computed<Analysis | null>(() => {
 
 const isFallback = computed(() => Boolean(data.value && !data.value.status.today_available && data.value.fallback));
 const assessments = computed<CategoryAssessment[]>(() => analysis.value?.categories ?? []);
+const detailSections = computed(() => {
+  const current = analysis.value;
+  if (!current) return [];
+  const detailed = current.detailed ?? {};
+  const quality = data.value?.evidenceBrief?.data_quality;
+  const qualityText = quality
+    ? `关键数据状态：${quality.stage_ready ? "关键锚可用" : "关键锚不可用"}。排除指标：${Array.isArray(quality.critical_missing) && quality.critical_missing.length ? quality.critical_missing.join("、") : "无"}。`
+    : undefined;
+  const sections = [
+    { id: "core", label: "核心依据", text: detailed.core_evidence ?? detailed.supporting ?? detailed.core },
+    { id: "pressure", label: "压力补充", text: detailed.pressure ?? current.pressure_summary },
+    { id: "contrary", label: "相反证据", text: detailed.contrary },
+    { id: "next", label: "下一阶段条件", text: detailed.next_stage },
+    {
+      id: "limits",
+      label: "数据限制",
+      text: detailed.data_limit ?? detailed.data_limits ?? detailed.data_quality ?? detailed.limitations ?? qualityText,
+    },
+  ];
+  return sections.filter((section): section is { id: string; label: string; text: string } => Boolean(section.text?.trim()));
+});
 const activeCategory = computed(() => data.value?.snapshot.categories.find((category) => category.id === activeCategoryId.value) ?? data.value?.snapshot.categories[0]);
 const activeMetric = computed<Metric | null>(() => {
   if (!data.value) return null;
@@ -83,23 +104,16 @@ function closeMethod(event: MouseEvent) {
             :fallback="data.fallback"
             :today-available="data.status.today_available"
             :last-success-date="data.status.last_success_date"
+            :data-insufficient="data.status.data_insufficient"
             :details-open="detailsOpen"
             @toggle-details="detailsOpen = !detailsOpen"
           />
           <StageAxis :current-stage="analysis?.stage ?? null" />
 
-          <section v-if="analysis && detailsOpen" class="detail-drawer" aria-label="详细分析">
-            <article>
-              <span class="eyebrow">支持证据</span>
-              <p>{{ analysis.detailed.supporting }}</p>
-            </article>
-            <article>
-              <span class="eyebrow">反面或未完成证据</span>
-              <p>{{ analysis.detailed.contrary }}</p>
-            </article>
-            <article>
-              <span class="eyebrow">下一阶段确认条件</span>
-              <p>{{ analysis.detailed.next_stage }}</p>
+          <section v-if="analysis && detailsOpen && detailSections.length" class="detail-drawer" aria-label="详细分析">
+            <article v-for="section in detailSections" :key="section.id">
+              <span class="eyebrow">{{ section.label }}</span>
+              <p>{{ section.text }}</p>
             </article>
           </section>
         </section>
@@ -152,7 +166,7 @@ function closeMethod(event: MouseEvent) {
                 :active-metric-id="activeMetricId"
                 @select="selectMetric"
               />
-              <p class="rail-note">核心 / 辅助角色用文字标注；卡片只显示当前档位，不显示距离。</p>
+              <p class="rail-note">角色与数据状态分开标注；过期或待验证指标仍保留展示，但不参与当前判断。</p>
             </aside>
 
             <div v-if="activeMetric && activeCategory" class="chart-column">

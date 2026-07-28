@@ -35,6 +35,7 @@ _RAW_TOP_LEVEL_KEYS = {
     "supporting_evidence",
     "contrary_evidence",
     "next_stage_confirmation",
+    "pressure_summary",
     "supporting",
     "contrary",
     "next_stage",
@@ -49,6 +50,7 @@ _DETAILED_KEYS = {
     "supporting_evidence",
     "contrary_evidence",
     "next_stage_confirmation",
+    "pressure",
 }
 _CATEGORY_KEYS = {"id", "category", "status", "note"}
 
@@ -179,6 +181,7 @@ def _normalise_analysis(payload: Mapping[str, Any]) -> dict[str, Any]:
         "supporting_evidence",
         "contrary_evidence",
         "next_stage_confirmation",
+        "pressure_summary",
     ):
         if key in payload:
             normalized[key] = payload[key]
@@ -208,6 +211,11 @@ def _normalise_analysis(payload: Mapping[str, Any]) -> dict[str, Any]:
                     if candidate in detailed:
                         normalized[target] = detailed[candidate]
                         break
+        if "pressure_summary" not in normalized:
+            for candidate in ("pressure_summary", "pressure"):
+                if candidate in detailed:
+                    normalized["pressure_summary"] = detailed[candidate]
+                    break
 
     for target, aliases in (
         ("supporting_evidence", ("supporting",)),
@@ -267,7 +275,12 @@ def _validate_categories(value: object, errors: list[str]) -> None:
         errors.append("categories 未覆盖全部六个固定类别")
 
 
-def validate_analysis(payload: Mapping[str, Any]) -> dict[str, Any]:
+def validate_analysis(
+    payload: Mapping[str, Any],
+    *,
+    allowed_stages: list[str] | tuple[str, ...] | None = None,
+    require_pressure_summary: bool = False,
+) -> dict[str, Any]:
     """Validate and return a canonical analysis, or raise ``InvalidAnalysisError``."""
 
     errors: list[str] = []
@@ -296,6 +309,8 @@ def validate_analysis(payload: Mapping[str, Any]) -> dict[str, Any]:
     stage = normalized.get("stage")
     if stage not in ALLOWED_STAGES:
         errors.append(f"未知 stage: {stage}")
+    if allowed_stages is not None and stage not in allowed_stages:
+        errors.append(f"stage 超出机器允许范围: {stage}；允许范围={list(allowed_stages)}")
 
     consistency = normalized.get("consistency")
     if stage != DATA_INSUFFICIENT_STAGE and "consistency" not in normalized:
@@ -319,6 +334,8 @@ def validate_analysis(payload: Mapping[str, Any]) -> dict[str, Any]:
     ):
         if field in normalized and not _text_value(normalized[field]):
             errors.append(f"{field} 必须是非空文本")
+    if require_pressure_summary and not _text_value(normalized.get("pressure_summary")):
+        errors.append("存在强辅助证据时必须填写 pressure_summary")
 
     if "categories" in normalized:
         _validate_categories(normalized["categories"], errors)

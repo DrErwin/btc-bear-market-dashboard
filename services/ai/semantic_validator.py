@@ -10,6 +10,8 @@ from .validator import InvalidAnalysisError
 
 
 def _triggered(metric: Mapping[str, Any]) -> bool:
+    if isinstance(metric.get("triggered"), bool):
+        return metric["triggered"]
     value = metric.get("current_value")
     if not isinstance(value, (int, float)):
         return False
@@ -86,14 +88,26 @@ def _metric_patterns(metric: Mapping[str, Any]) -> list[re.Pattern[str]]:
     return [_alias_pattern(alias) for alias in aliases if alias]
 
 
+def _input_metrics(ai_input: Mapping[str, Any]) -> tuple[list[Mapping[str, Any]], bool]:
+    """Return metric states and whether the input is the v0.3 evidence boundary."""
+
+    raw = ai_input.get("metric_states")
+    if isinstance(raw, list):
+        return [item for item in raw if isinstance(item, Mapping)], True
+    raw = ai_input.get("metrics")
+    if isinstance(raw, list):
+        return [item for item in raw if isinstance(item, Mapping)], False
+    return [], False
+
+
 def validate_analysis_semantics(
     analysis: Mapping[str, Any],
     ai_input: Mapping[str, Any],
 ) -> None:
     """Reject prose that contradicts trigger state or fixed metric meaning."""
 
-    metrics = ai_input.get("metrics")
-    if not isinstance(metrics, list):
+    metrics, is_evidence_input = _input_metrics(ai_input)
+    if not metrics:
         raise InvalidAnalysisError("AI 语义校验缺少 metrics 输入")
 
     errors: list[str] = []
@@ -101,8 +115,6 @@ def validate_analysis_semantics(
     triggered_by_category: dict[str, bool] = {}
 
     for metric in metrics:
-        if not isinstance(metric, Mapping):
-            continue
         category = str(metric.get("category", ""))
         is_triggered = _triggered(metric)
         triggered_by_category[category] = (
@@ -122,6 +134,10 @@ def validate_analysis_semantics(
                 continue
             category = str(item.get("category", item.get("id", "")))
             status = item.get("status")
+            if is_evidence_input and category not in triggered_by_category:
+                # v0.3 categories remain a display summary; the two core
+                # dimensions are guarded separately by allowed_stages.
+                continue
             has_trigger = triggered_by_category.get(category, False)
             if not has_trigger and status != "未确认":
                 errors.append(
@@ -142,6 +158,35 @@ def validate_analysis_semantics(
             "HODLer 零线不得改名为积累/链上花费分界，"
             "请使用长期供应净变化零线"
         )
+
+    strong_themes = ai_input.get("strong_auxiliary_themes")
+    if isinstance(strong_themes, list) and strong_themes:
+        pressure = _as_text(analysis.get("pressure_summary"))
+        if not pressure:
+            errors.append("存在强辅助证据时必须说明阶段内部压力")
+
+    if is_evidence_input and analysis.get("stage") != "数据不足":
+        summary = _as_text(analysis.get("summary"))
+        compact = analysis.get("compact")
+        if isinstance(compact, Mapping):
+            summary += " " + _as_text(compact.get("support"))
+        summary += " " + _as_text(analysis.get("pressure_summary"))
+        signal_terms = (
+            r"估值|成本|矿工|收入压力|供应|亏损|投降|卖方|耗竭|恢复|承接|持有者|资本"
+        )
+        if len(re.findall(signal_terms, summary)) < 2:
+            errors.append("首屏解释必须综合至少两个证据维度")
+
+        visible_metric_names = 0
+        for metric in metrics:
+            if any(pattern.search(summary) for pattern in _metric_patterns(metric)):
+                visible_metric_names += 1
+        if visible_metric_names > 4:
+            errors.append("首屏解释最多提及四个代表性指标")
+        if re.search(r"(?:\$|\d+\.\d+\s*%?|\b\d+\.\d+\b|Market\s*Cap\s*/|Realized\s*Cap\s*/|公式=)", summary, re.IGNORECASE):
+            errors.append("首屏解释不应复述公式或卡片数值")
+        if re.search(r"新闻|宏观|美联储|ETF|外部消息|政策声明", summary, re.IGNORECASE):
+            errors.append("解释只能使用证据简报，不得引入外部信息")
 
     if errors:
         raise InvalidAnalysisError(errors)

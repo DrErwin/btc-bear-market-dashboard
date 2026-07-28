@@ -24,7 +24,7 @@ from playwright.sync_api import Page, expect, sync_playwright
 
 ROOT = Path(__file__).resolve().parents[2]
 DIST = ROOT / "dashboard" / "dist"
-EVIDENCE = ROOT / "artifacts" / "review-evidence"
+EVIDENCE = ROOT / "artifacts" / "review-evidence" / "v0.3.0"
 # 4173 is commonly occupied by another local prototype in this workspace.
 PORT = 4175
 BASE_URL = f"http://127.0.0.1:{PORT}/"
@@ -37,6 +37,10 @@ def load_success_analysis() -> dict:
     if not isinstance(analysis, dict):
         raise RuntimeError("数据包缺少可展示的 AI 分析或回退结论")
     return analysis
+
+
+def load_packet_fixture(name: str = "packet.json") -> dict:
+    return json.loads((DIST / "data" / name).read_text(encoding="utf-8"))
 
 
 def wait_for_server() -> None:
@@ -166,13 +170,22 @@ def success_flow(page: Page) -> None:
     expect(detail).to_have_attribute("aria-expanded", "false")
     detail.click()
     expect(detail).to_have_attribute("aria-expanded", "true")
-    expect(page.get_by_text("支持证据", exact=True)).to_be_visible()
+    expect(page.get_by_text("核心依据", exact=True)).to_be_visible()
+    if analysis.get("pressure_summary"):
+        expect(page.get_by_text("阶段内部压力", exact=True)).to_be_visible()
     detail.click()
     expect(detail).to_have_attribute("aria-expanded", "false")
 
     board_box = page.locator(".evidence-board").bounding_box()
     assert board_box and board_box["y"] < 900, "1440x900 首屏应看到分类看板顶部"
     assert page.locator(".category-grid .category-card").count() == 6
+    availability_by_id = {
+        metric["id"]: metric.get("availability_status")
+        for metric in load_packet_fixture()["snapshot"]["metrics"]
+    }
+    assert availability_by_id["hodler"] == "display_only"
+    assert availability_by_id["spent155"] == "display_only"
+    assert availability_by_id["cvdd"] == "validation_pending"
     expected_status_counts = Counter(item["status"] for item in analysis["categories"])
     for status in ("未确认", "部分确认", "充分确认"):
         assert page.get_by_text(status, exact=True).count() == expected_status_counts[status]
@@ -254,11 +267,13 @@ def success_flow(page: Page) -> None:
 
 
 def failure_flow(page: Page) -> None:
+    failure_packet = load_packet_fixture("packet-failure.json")
+    fallback = failure_packet.get("fallback") or {}
     page.set_viewport_size({"width": 1440, "height": 900})
     open_page(page, "failure")
     expect(page.get_by_text("今日 AI 分析不可用", exact=True)).to_be_visible()
-    expect(page.get_by_text("2026-07-26", exact=True)).to_be_visible()
-    expect(page.get_by_text("深度压力期", exact=True).first).to_be_visible()
+    expect(page.get_by_text(str(fallback.get("analysis_date")), exact=True)).to_be_visible()
+    expect(page.get_by_text(str(fallback.get("stage")), exact=True).first).to_be_visible()
     assert page.locator(".category-grid .category-card").count() == 6
     assert page.locator(".metric-card").count() == 3
     page.screenshot(path=str(EVIDENCE / "desktop-fallback.png"), full_page=True)
@@ -475,6 +490,14 @@ def ai_contract_flow() -> None:
             str(ROOT / "tests" / "acceptance" / "test_input_boundary.py"),
             str(ROOT / "tests" / "acceptance" / "test_packet_contract.py"),
             str(ROOT / "tests" / "acceptance" / "test_v024_chart_data.py"),
+            str(ROOT / "tests" / "acceptance" / "test_evidence_contract.py"),
+            str(ROOT / "tests" / "acceptance" / "test_evidence_fixtures.py"),
+            str(ROOT / "tests" / "acceptance" / "test_evidence_freshness.py"),
+            str(ROOT / "tests" / "acceptance" / "test_core_dimensions.py"),
+            str(ROOT / "tests" / "acceptance" / "test_auxiliary_themes.py"),
+            str(ROOT / "tests" / "acceptance" / "test_stage_guardrail.py"),
+            str(ROOT / "tests" / "acceptance" / "test_v03_ai_boundary.py"),
+            str(ROOT / "tests" / "acceptance" / "test_v03_packet_contract.py"),
         ]
     )
     if result != pytest.ExitCode.OK:
@@ -484,6 +507,15 @@ def ai_contract_flow() -> None:
 def main() -> int:
     EVIDENCE.mkdir(parents=True, exist_ok=True)
     sys.path.insert(0, str(ROOT))
+    npm = "npm.cmd" if os.name == "nt" else "npm"
+    build = subprocess.run(
+        [npm, "run", "build"],
+        cwd=ROOT / "dashboard",
+        check=False,
+        text=True,
+    )
+    if build.returncode != 0:
+        raise AssertionError(f"前端构建失败，exit code={build.returncode}")
     ai_contract_flow()
     server = start_server()
     try:

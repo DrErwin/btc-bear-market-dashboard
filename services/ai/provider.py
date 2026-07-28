@@ -30,7 +30,8 @@ from .contract import (
     CATEGORY_STATUS_VALUES,
     CONSISTENCY_VALUES,
 )
-from .input_builder import build_ai_input
+from .input_builder import build_evidence_input
+from services.evidence.compiler import compile_evidence
 
 
 DEFAULT_BASE_URL = "https://open.bigmodel.cn/api/paas/v4"
@@ -38,8 +39,10 @@ DEFAULT_MODEL = "glm-5.2"
 
 
 _SYSTEM_PROMPT = (
-    "你是 BTC 周期证据看板的日度分析器。根据给定的指标快照，把当前市场归纳为一个阶段并解释证据。"
-    "你只能基于已提供的指标事实做归纳，绝不预测价格、不给出任何买卖/入场/仓位/杠杆建议、不输出任何概率或置信度数字。"
+    "你是 BTC 周期证据看板的日度分析器。机器已经把指标整理成核心维度和辅助证据主题。"
+    "你的任务是综合这些证据关系，在机器给出的相邻阶段范围内选择一个阶段并解释为什么。"
+    "先说证据合在一起说明什么，再提少量代表性指标；不要逐项复述指标定义或卡片数字。"
+    "你只能基于已提供的证据简报做归纳，绝不预测价格、不给出任何买卖/入场/仓位/杠杆建议、不输出任何概率或置信度数字。"
     "输出必须是单个 JSON 对象，字段使用简体中文，遵循下面给定的固定词汇表与结构。"
 )
 
@@ -58,20 +61,19 @@ def _user_prompt(
         )
     return (
         f"分析日期 analysis_date = {data_date}。\n"
-        f"阶段只能从这些里选一个 stage：{list(ALLOWED_STAGES)}。\n"
+        f"阶段只能从机器允许范围中选一个 stage：{[item.get('stage') for item in ai_input.get('allowed_stages', [])]}。\n"
         f"一致性只能从这些里选 consistency：{list(CONSISTENCY_VALUES)}。\n"
         f"必须为这六个类别各给出 status（只能从 {list(CATEGORY_STATUS_VALUES)} 中选）：{list(CATEGORY_IDS)}。\n\n"
-        "证据判定必须严格遵守 thresholds：direction=below 时 current_value 小于阈值才算触发；"
-        "direction=above 时 current_value 大于阈值才算触发。\n"
-        "只有触发阈值的指标才能列入支持证据；未触发的指标只能列入阻碍、反面证据或待确认条件，"
-        "不能因为数值看起来偏高、偏低、为正或为负就自行改变阈值方向。\n"
-        "compact.support 与 detailed.supporting 中不得出现任何未触发指标的名称或数值，"
-        "即使只是补充背景也不行；请把它们全部放到 obstacle 或 contrary。\n"
-        "核心或辅助是指标角色，不是类别角色；不要把类别称为核心类别或辅助类别，也不要把包含核心指标的类别概括为辅助类别。\n\n"
-        "描述阈值档位时必须先看该指标实际提供了几个触发阈值："
-        "只有一个触发阈值的指标，应说它已触发唯一阈值或尚未触发唯一阈值，"
-        "不得说它未触发更深档位，也不得把它和多档指标合并描述为都未触发更深档位。\n\n"
+        "机器已经标出哪些证据可用、哪些主题较强；不要把被排除指标当成当前支持或反面证据。\n"
+        "只有触发阈值的指标才能列入支持证据；未触发的指标只能列入阻碍、反面证据或待确认条件。\n"
+        "compact.support 与 detailed.supporting 中不得出现任何未触发指标的名称或数值。\n"
+        "核心或辅助是指标角色，不是类别角色；不要把类别称为核心类别或辅助类别。\n"
+        "只有一个触发阈值的指标，应说它已触发唯一阈值或尚未触发唯一阈值，不得说它未触发更深档位。\n"
+        "MVRV 与 AVIV 属于同一个估值维度，不能写成两张估值票；Puell 是独立的矿工压力维度。\n"
+        "辅助主题不能扩大 allowed_stages；它们只能帮助你解释当前阶段内部的压力、投降、恢复或矛盾。\n"
+        "当 strong_auxiliary_themes 非空时，pressure_summary 必须明确说明当前阶段内部的压力程度。\n\n"
         "即使是否定句或风险提示，也不要复述任何禁止词；只描述证据、阶段和待确认条件。\n"
+        "描述阈值档位时不得把单阈值指标说成还缺少更深档位。\n"
         f"禁止词表（输入里出现也不能照抄）：{forbidden_terms}。\n"
         "提及相关指标时，改用“链上花费”“供应变化”“阶段确认”等中性说法。\n"
         "Reserve Risk 的数值进入周期低位，含义是长期持有信念进入周期高位，绝不能写成持有信念低位。\n"
@@ -82,7 +84,8 @@ def _user_prompt(
         '  "analysis_date": "<上面给的分析日期>",\n'
         '  "stage": "<阶段>",\n'
         '  "consistency": "<一致性>",\n'
-        '  "summary": "<一段基于证据的归纳，不预测价格>",\n'
+        '  "summary": "<先综合至少两个证据维度，再用少量代表性证据说明，不预测价格>",\n'
+        '  "pressure_summary": "<若有强辅助主题，说明当前阶段内部压力；否则为空字符串>",\n'
         '  "compact": {\n'
         '    "support": {"title": "<短标题>", "text": "<支持证据要点>"},\n'
         '    "obstacle": {"title": "<短标题>", "text": "<未完成或反面证据>"},\n'
@@ -93,9 +96,10 @@ def _user_prompt(
         "    // 共 6 个，覆盖全部类别\n"
         "  ],\n"
         '  "detailed": {\n'
-        '    "supporting": "<支持证据的详细说明>",\n'
+        '    "supporting": "<核心依据与辅助主题如何共同支持当前阶段>",\n'
         '    "contrary": "<反面或未完成证据的详细说明>",\n'
-        '    "next_stage": "<下一阶段确认条件的详细说明>"\n'
+        '    "next_stage": "<下一阶段确认条件的详细说明>",\n'
+        '    "pressure": "<阶段内部压力的展开说明，可为空>"\n'
         "  }\n"
         "}\n\n"
         "指标快照输入（只读，作为归纳依据）：\n"
@@ -149,30 +153,81 @@ def _chat(
     return parsed
 
 
-def _mock_analysis(data_date: str) -> dict:
+def _mock_analysis(data_date: str, evidence_brief: dict | None = None) -> dict:
     """A fixed, validator-compliant analysis for offline / --mock-ai runs."""
+    brief = evidence_brief or {}
+    allowed = brief.get("allowed_stages") or ["熊市下行期"]
+    strong = brief.get("strong_auxiliary_themes") or []
+    # 机器层已经给出允许的阶段范围。没有强辅助证据时，离线示例取较保守的一端；
+    # 只有在辅助证据确实形成一致压力时，才展示范围内更高的一档。
+    stage = allowed[-1] if strong and len(allowed) > 1 else allowed[0]
+    strong_labels = [str(item.get("label")) for item in strong if item.get("label")]
+    pressure = (
+        f"{'、'.join(strong_labels)}等辅助证据同时偏强，"
+        "说明当前阶段内部的压力较重，但它们不会越过核心阶段上限。"
+        if strong
+        else "当前辅助证据没有形成额外的强压力主题。"
+    )
+    dimensions = brief.get("core_dimensions", {})
+    valuation_state = dimensions.get("valuation", {}).get("state")
+    miners_state = dimensions.get("miners", {}).get("state")
+    status_for_state = {"none": "未确认", "watch": "部分确认", "deep": "充分确认"}
+    valuation_status = status_for_state.get(valuation_state, "未确认")
+    miners_status = status_for_state.get(miners_state, "未确认")
     return {
         "analysis_date": data_date,
-        "stage": "筑底证据积累期",
-        "consistency": "中等",
-        "summary": "多类证据向底部结构收敛，但尚未形成完整一致性。",
+        "stage": stage,
+        "consistency": "中等" if len(allowed) > 1 else "弱",
+        "summary": "估值与矿工压力共同决定当前阶段范围，辅助证据用于补充压力和未完成条件。",
+        "pressure_summary": pressure,
         "compact": {
-            "support": {"title": "估值 + 矿工压力", "text": "核心估值与矿工压力类别已进入观察区。"},
+            "support": {"title": "估值 + 矿工压力", "text": "估值和矿工收入两个独立维度共同限定了当前阶段范围。"},
             "obstacle": {"title": "持有者行为仍在积累", "text": "持有者类别证据仍需更多独立确认。"},
-            "next": {"title": "核心类别继续收敛", "text": "等待更多核心类别同步确认。"},
+            "next": {"title": "下一阶段条件", "text": "等待简报列出的核心条件进一步满足。"},
         },
         "categories": [
-            {"id": "valuation", "status": "充分确认", "note": "核心估值进入深度观察。"},
+            {"id": "valuation", "status": valuation_status, "note": "MVRV 形成估值维度状态。"},
             {"id": "supply", "status": "部分确认", "note": "供应盈亏结构偏向压力。"},
             {"id": "capital", "status": "部分确认", "note": "已实现资本仍偏弱。"},
             {"id": "holders", "status": "充分确认", "note": "持有者投降证据增强。"},
-            {"id": "miners", "status": "部分确认", "note": "矿工压力进入观察区。"},
+            {"id": "miners", "status": miners_status, "note": "Puell 形成矿工压力维度状态。"},
             {"id": "anchors", "status": "部分确认", "note": "长期成本锚开始接近。"},
         ],
         "detailed": {
-            "supporting": "估值与矿工压力类别提供核心支持证据，多个核心维度进入观察区。",
+            "supporting": "估值与矿工压力是两个独立核心维度；辅助主题只用于补充当前阶段内部的压力强度。",
             "contrary": "持有者投降信号与长期成本锚类别仍未充分聚合。",
             "next_stage": "需要核心类别与支持证据形成更完整的一致性组合。",
+            "pressure": pressure,
+        },
+    }
+
+
+def data_insufficient_analysis(data_date: str, evidence_brief: dict) -> dict:
+    """Create a deterministic system-state result without calling an AI."""
+
+    missing = evidence_brief.get("data_quality", {}).get("critical_missing", [])
+    detail = "、".join(str(item) for item in missing) or "关键指标"
+    reason = f"{detail} 当前不可用，暂时不能形成阶段判断。"
+    return {
+        "analysis_date": data_date,
+        "stage": "数据不足",
+        "consistency": "弱",
+        "summary": "当前关键数据不完整，页面只说明数据状态，不把缺失数据当作未触发证据。",
+        "pressure_summary": "",
+        "compact": {
+            "support": {"title": "数据状态", "text": reason},
+            "obstacle": {"title": "暂不能判断", "text": "MVRV 与 Puell 必须同时有当前有效数据。"},
+            "next": {"title": "恢复判断条件", "text": "补齐关键锚的当前数据后，系统才会重新生成阶段解释。"},
+        },
+        "categories": [
+            {"id": category, "status": "未确认", "note": "数据不足，不把缺失解释为未触发。"}
+            for category in CATEGORY_IDS
+        ],
+        "detailed": {
+            "supporting": reason,
+            "contrary": "当前没有足够的关键锚数据，辅助指标也不会替代核心判断。",
+            "next_stage": "关键锚恢复当前有效后，重新检查估值和矿工压力两个独立维度。",
+            "pressure": "",
         },
     }
 
@@ -189,10 +244,42 @@ def call_ai(
     with a human-readable ``reason`` when AI is unavailable / non-compliant so
     the caller falls back to the previous success packet.
     """
-    if mock:
-        analysis = _mock_analysis(data_date)
+    # The empty-input mock is kept for the contract unit tests and local
+    # smoke checks; a real daily run always supplies all sixteen cards.
+    if mock and not isinstance(snapshot.get("metrics"), list):
+        legacy = _mock_analysis(data_date, {"allowed_stages": ["筑底证据积累期"]})
         try:
-            validator.validate_analysis(analysis)
+            validator.validate_analysis(legacy)
+        except validator.InvalidAnalysisError as exc:
+            return None, f"mock 分析契约校验失败: {exc.errors[:3]}"
+        return legacy, None
+
+    try:
+        evidence_brief = compile_evidence(snapshot, analysis_date=data_date)
+    except (KeyError, OSError, TypeError, ValueError) as exc:
+        return None, f"证据整理失败: {type(exc).__name__}: {str(exc)[:120]}"
+
+    if not evidence_brief["data_quality"]["stage_ready"]:
+        missing = ", ".join(evidence_brief["data_quality"].get("critical_missing", []))
+        return None, f"数据不足：关键锚不可用（{missing or '未知原因'}），不调用 AI"
+
+    ai_input = build_evidence_input(
+        snapshot,
+        evidence_brief=evidence_brief,
+        analysis_date=data_date,
+    )
+    allowed_stages = evidence_brief["allowed_stages"]
+    require_pressure = bool(evidence_brief.get("strong_auxiliary_themes"))
+
+    if mock:
+        analysis = _mock_analysis(data_date, evidence_brief)
+        try:
+            validator.validate_analysis(
+                analysis,
+                allowed_stages=allowed_stages,
+                require_pressure_summary=require_pressure,
+            )
+            semantic_validator.validate_analysis_semantics(analysis, ai_input)
         except validator.InvalidAnalysisError as exc:
             return None, f"mock 分析契约校验失败: {exc.errors[:3]}"
         return analysis, None
@@ -203,11 +290,6 @@ def call_ai(
 
     base_url = os.environ.get("AI_BASE_URL", "").strip() or DEFAULT_BASE_URL
     model = os.environ.get("AI_MODEL", "").strip() or DEFAULT_MODEL
-
-    try:
-        ai_input = build_ai_input(snapshot)
-    except (OSError, KeyError, ValueError) as exc:
-        return None, f"AI 调用失败: {type(exc).__name__}: {str(exc)[:120]}"
 
     validation_feedback: str | None = None
     last_call_error: str | None = None
@@ -238,7 +320,12 @@ def call_ai(
             return None, last_call_error
 
         try:
-            validator.validate_analysis(raw)
+            raw.setdefault("analysis_date", data_date)
+            validator.validate_analysis(
+                raw,
+                allowed_stages=allowed_stages,
+                require_pressure_summary=require_pressure,
+            )
             semantic_validator.validate_analysis_semantics(raw, ai_input)
         except validator.InvalidAnalysisError as exc:
             if attempt < 2:

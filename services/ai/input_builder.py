@@ -18,6 +18,7 @@ from .contract import (
     CATEGORY_STATUS_VALUES,
     DATA_INSUFFICIENT_STAGE,
 )
+from services.evidence.compiler import compile_evidence
 
 
 _REQUIRED_METRIC_KEYS = (
@@ -105,7 +106,7 @@ def _metric_inputs(snapshot: Mapping[str, Any]) -> list[dict[str, object]]:
         if category not in CATEGORY_IDS:
             raise ValueError(f"指标 {metric_id} 使用未知类别: {category}")
         role = _text(raw_metric["role"], f"metrics[{index}].role")
-        if role not in {"核心", "辅助"}:
+        if role not in {"核心", "核心锚", "核心复核", "强辅助", "辅助"}:
             raise ValueError(f"指标 {metric_id} 使用未知角色: {role}")
 
         raw_thresholds = raw_metric["thresholds"]
@@ -191,6 +192,82 @@ def build_ai_input(snapshot: str | Path | Mapping[str, Any]) -> dict[str, object
         ],
         "category_definitions": _category_definitions(loaded),
         "metrics": _metric_inputs(loaded),
+    }
+
+
+def build_evidence_input(
+    snapshot: str | Path | Mapping[str, Any],
+    *,
+    evidence_brief: Mapping[str, Any] | None = None,
+    analysis_date: str | None = None,
+) -> dict[str, object]:
+    """Build the v0.3.0 AI boundary from a deterministic evidence brief.
+
+    The old ``build_ai_input`` function remains available for v0.2 fixtures and
+    compatibility tests.  The live provider uses this function: it receives
+    relationships, eligibility, and stage limits rather than a sixteen-item
+    definition dump.  Metric states are retained only for traceability (value,
+    date, trigger status, and reason); formulas, source metadata, chart history
+    and price are intentionally absent.
+    """
+
+    loaded = _load_snapshot(snapshot)
+    brief = dict(evidence_brief or compile_evidence(loaded, analysis_date=analysis_date))
+    allowed = brief.get("allowed_stages")
+    if not isinstance(allowed, list) or not allowed:
+        raise ValueError("证据简报缺少 allowed_stages")
+
+    metric_states = brief.get("metric_states")
+    if not isinstance(metric_states, list):
+        raise ValueError("证据简报缺少 metric_states")
+    # Do not pass display-only/pending values as if they were evidence.  Their
+    # status and reason stay in data_quality so the AI can explain limitations.
+    eligible_states = [
+        {
+            "id": state.get("id"),
+            "name": state.get("label"),
+            "role": state.get("role"),
+            "status": state.get("status"),
+            "judgment_eligible": state.get("judgment_eligible"),
+            "triggered": state.get("triggered"),
+            "current_value": state.get("current_value"),
+            "metric_date": state.get("metric_date"),
+        }
+        for state in metric_states
+        if isinstance(state, Mapping) and state.get("judgment_eligible") is True
+    ]
+    excluded_states = [
+        {
+            "id": state.get("id"),
+            "name": state.get("label"),
+            "status": state.get("status"),
+            "reason": state.get("reason"),
+            "metric_date": state.get("metric_date"),
+        }
+        for state in metric_states
+        if isinstance(state, Mapping) and state.get("judgment_eligible") is not True
+    ]
+
+    return {
+        "input_version": "0.3.0",
+        "analysis_date": brief.get("analysis_date"),
+        "allowed_stages": [
+            {"stage": stage, "definition": STAGE_DEFINITIONS[stage]}
+            for stage in allowed
+            if stage in STAGE_DEFINITIONS
+        ],
+        "core_dimensions": brief.get("core_dimensions", {}),
+        "strong_auxiliary_themes": brief.get("strong_auxiliary_themes", []),
+        "auxiliary_themes": brief.get("auxiliary_themes", []),
+        "contrary_or_incomplete": brief.get("contrary_or_incomplete", []),
+        "next_stage_conditions": brief.get("next_stage_conditions", []),
+        "data_quality": {
+            "stage_ready": brief.get("data_quality", {}).get("stage_ready"),
+            "common_anchor_date": brief.get("data_quality", {}).get("common_anchor_date"),
+            "critical_missing": brief.get("data_quality", {}).get("critical_missing", []),
+            "excluded_metrics": excluded_states,
+        },
+        "metric_states": eligible_states,
     }
 
 

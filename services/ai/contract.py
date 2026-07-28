@@ -107,8 +107,8 @@ ANALYSIS_SCHEMA: Final[dict[str, object]] = {
         "supporting_evidence": {"type": "string", "minLength": 1},
         "contrary_evidence": {"type": "string", "minLength": 1},
         "next_stage_confirmation": {"type": "string", "minLength": 1},
+        "pressure_summary": {"type": "string", "minLength": 1},
     },
     "additionalProperties": False,
 }
 OUTPUT_SCHEMA: Final[dict[str, object]] = ANALYSIS_SCHEMA
-

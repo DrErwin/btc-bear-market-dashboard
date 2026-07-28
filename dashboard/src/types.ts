@@ -1,4 +1,26 @@
-export type Role = "核心" | "辅助";
+/**
+ * A metric's fixed evidence role. The two short values are kept so that
+ * v0.2 packets can still be read while the evidence registry migrates.
+ */
+export type Role =
+  | "核心锚"
+  | "核心复核"
+  | "强辅助"
+  | "辅助"
+  | "核心"
+  | "supporting"
+  | "core";
+
+/** Whether this metric may enter the current evidence brief. */
+export type MetricAvailabilityStatus =
+  | "current"
+  | "display_only"
+  | "validation_pending"
+  | "missing"
+  | "当前可用"
+  | "仅供展示"
+  | "待验证"
+  | "缺失";
 export type CategoryStatus = "未确认" | "部分确认" | "充分确认";
 export type Consistency = "弱" | "中等" | "强";
 export type Stage =
@@ -34,6 +56,15 @@ export interface Metric {
   tier_label: string;
   tier_meaning: string;
   thresholds: Threshold[];
+  /** v0.3 evidence/data-quality fields. Optional for v0.2 fixture compatibility. */
+  availability_status?: MetricAvailabilityStatus | string | null;
+  judgment_eligible?: boolean | null;
+  days_stale?: number | null;
+  availability_reason?: string | null;
+  /** Evidence-brief aliases accepted during packet assembly migration. */
+  status?: MetricAvailabilityStatus | string | null;
+  reason?: string | null;
+  metric_date?: string | null;
 }
 
 export interface Category {
@@ -52,6 +83,24 @@ export interface Snapshot {
   };
   categories: Category[];
   metrics: Metric[];
+}
+
+export interface EvidenceBrief {
+  brief_version?: string;
+  analysis_date?: string;
+  allowed_stages: string[];
+  core_dimensions: Record<string, unknown>;
+  strong_auxiliary_themes: Array<Record<string, unknown>>;
+  auxiliary_themes?: Array<Record<string, unknown>>;
+  contrary_or_incomplete?: Array<Record<string, unknown>>;
+  next_stage_conditions?: string[];
+  data_quality: {
+    stage_ready?: boolean;
+    critical_missing?: string[];
+    common_anchor_date?: string | null;
+    [key: string]: unknown;
+  };
+  metric_states?: Array<Record<string, unknown>>;
 }
 
 export interface SeriesPoint {
@@ -117,6 +166,8 @@ export interface Analysis {
   stage: Stage;
   consistency: Consistency;
   summary: string;
+  /** A short ordinary-reader explanation of strong auxiliary pressure, if any. */
+  pressure_summary?: string | null;
   compact: {
     support: { title: string; text: string };
     obstacle: { title: string; text: string };
@@ -124,9 +175,20 @@ export interface Analysis {
   };
   categories: CategoryAssessment[];
   detailed: {
-    supporting: string;
-    contrary: string;
-    next_stage: string;
+    /** Legacy v0.2 name for the core evidence section. */
+    supporting?: string;
+    /** Preferred v0.3 name for the core evidence section. */
+    core_evidence?: string;
+    core?: string;
+    /** Strong auxiliary evidence explained without moving the stage ceiling. */
+    pressure?: string;
+    contrary?: string;
+    next_stage?: string;
+    /** v0.3 data-quality limits; aliases keep early fixtures readable. */
+    data_limit?: string;
+    data_limits?: string;
+    data_quality?: string;
+    limitations?: string;
   };
 }
 
@@ -134,6 +196,8 @@ export interface StatusData {
   today_available: boolean;
   last_success_date: string | null;
   reason: string | null;
+  data_insufficient?: boolean;
+  data_quality?: Record<string, unknown>;
 }
 
 /**
@@ -155,6 +219,7 @@ export interface Packet {
     source: Record<string, unknown>;
   };
   snapshot: Snapshot;
+  evidence_brief?: EvidenceBrief;
   series: SeriesData;
   bars: Record<string, BarSeries>;
   bottoms: BottomMark[];
@@ -165,6 +230,7 @@ export interface Packet {
 
 export interface DashboardData {
   snapshot: Snapshot;
+  evidenceBrief?: EvidenceBrief;
   series: SeriesData;
   bars: Record<string, BarSeries>;
   bottoms: BottomMark[];

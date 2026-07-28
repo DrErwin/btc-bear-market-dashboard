@@ -6,12 +6,13 @@ def build_valid_analysis(packet: dict) -> dict:
 
     return {
         "analysis_date": packet["data_date"],
-        "stage": "深度压力期",
+        "stage": "熊市下行期",
         "consistency": "中等",
         "summary": (
             "RUP 已触发利润压缩线，长期持有信念进入周期高位；"
             "核心估值仍未确认。"
         ),
+        "pressure_summary": "已实现亏损和卖方耗竭辅助证据偏强，说明当前阶段内部的压力较重，但没有改变核心阶段上限。",
         "compact": {
             "support": {
                 "title": "已触发证据",

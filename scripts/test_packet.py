@@ -14,7 +14,9 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
+from services.ai import provider  # noqa: E402
 from services.data import fetch, metrics, packet  # noqa: E402
+from services.evidence.compiler import compile_evidence  # noqa: E402
 
 
 MOCK_ANALYSIS = {
@@ -63,8 +65,9 @@ def main() -> int:
     print(f"Path A (failure) OK: analysis=null, reason={pkt_fail['status']['reason']}")
 
     # Path B: today available with mock analysis.
-    mock = json.loads(json.dumps(MOCK_ANALYSIS))
-    mock["analysis_date"] = data_date
+    snapshot = packet.build_snapshot(computed)
+    evidence_brief = compile_evidence(snapshot, analysis_date=data_date)
+    mock = provider._mock_analysis(data_date, evidence_brief)
     pkt_ok = packet.build_packet(
         computed,
         analysis=mock, fallback=None,
@@ -72,7 +75,7 @@ def main() -> int:
         run_id="test-ok-001", generated_at="2026-07-27T00:00:00Z",
     )
     assert pkt_ok["status"]["today_available"] is True
-    assert pkt_ok["analysis"]["stage"] == "筑底证据积累期"
+    assert pkt_ok["analysis"]["stage"] in evidence_brief["allowed_stages"]
     print(f"Path B (success) OK: stage={pkt_ok['analysis']['stage']}")
 
     # Structure summary.

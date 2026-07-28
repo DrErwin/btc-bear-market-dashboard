@@ -31,6 +31,7 @@ sys.path.insert(0, str(ROOT))
 
 from services.ai import provider  # noqa: E402
 from services.data import fetch, metrics, packet  # noqa: E402
+from services.evidence.compiler import compile_evidence  # noqa: E402
 
 
 DEFAULT_PACKET_PATH = ROOT / "dashboard" / "public" / "data" / "packet.json"
@@ -103,9 +104,18 @@ def run(
 
     # 3. AI analysis (None + reason on any failure -> fallback).
     snapshot = packet.build_snapshot(computed)
-    analysis, ai_reason = provider.call_ai(
-        snapshot, data_date=data_date.isoformat(), mock=mock_ai
-    )
+    evidence_brief = compile_evidence(snapshot, analysis_date=data_date.isoformat())
+    if evidence_brief["data_quality"]["stage_ready"]:
+        analysis, ai_reason = provider.call_ai(
+            snapshot, data_date=data_date.isoformat(), mock=mock_ai
+        )
+        data_insufficient = False
+    else:
+        analysis = provider.data_insufficient_analysis(
+            data_date.isoformat(), evidence_brief
+        )
+        ai_reason = "数据不足：关键锚不可用，不调用 AI"
+        data_insufficient = True
 
     # 4. Resolve analysis + fallback against the previous success.
     previous = packet.load_packet(packet_path)
@@ -114,7 +124,15 @@ def run(
     prev_last_success = previous["status"]["last_success_date"] if previous else None
     carry_forward = prev_analysis or prev_fallback
 
-    if analysis is not None:
+    if data_insufficient:
+        today_available = True
+        new_analysis = analysis
+        new_fallback = carry_forward
+        last_success_date = prev_last_success
+        reason = ai_reason
+        outcome = "published-data-insufficient"
+        analysis_stage = analysis.get("stage")
+    elif analysis is not None:
         today_available = True
         new_analysis = analysis
         new_fallback = carry_forward

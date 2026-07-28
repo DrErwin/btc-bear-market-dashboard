@@ -28,6 +28,7 @@ export async function loadDashboardData(): Promise<DashboardData> {
 
   return {
     snapshot: packet.snapshot,
+    evidenceBrief: packet.evidence_brief,
     series: packet.series,
     bars: packet.bars ?? {},
     bottoms: packet.bottoms ?? [],

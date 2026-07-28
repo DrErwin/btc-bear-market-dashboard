@@ -7,6 +7,7 @@ const props = defineProps<{
   todayAvailable: boolean;
   lastSuccessDate: string | null;
   detailsOpen: boolean;
+  dataInsufficient?: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -22,7 +23,16 @@ function statusLabel() {
 
 <template>
   <section class="evaluation" aria-labelledby="evaluation-title">
-    <div v-if="!todayAvailable" class="availability-banner" :class="{ 'has-fallback': fallback }" role="status">
+    <div v-if="dataInsufficient" class="availability-banner" role="status">
+      <span class="availability-icon" aria-hidden="true">!</span>
+      <div>
+        <strong>当前数据不足</strong>
+        <span>关键锚数据没有同时通过新鲜度检查，系统没有调用 AI，也没有把缺失数据当作未触发。</span>
+      </div>
+      <span class="availability-note">等待数据恢复</span>
+    </div>
+
+    <div v-else-if="!todayAvailable" class="availability-banner" :class="{ 'has-fallback': fallback }" role="status">
       <span class="availability-icon" aria-hidden="true">!</span>
       <div>
         <strong>今日 AI 分析不可用</strong>
@@ -38,7 +48,13 @@ function statusLabel() {
           <span class="eyebrow">当前市场阶段</span>
           <h1 id="evaluation-title">{{ analysis.stage }}</h1>
         </div>
-        <p class="evaluation-summary">{{ analysis.summary }}</p>
+        <div class="evaluation-copy">
+          <p class="evaluation-summary">{{ analysis.summary }}</p>
+          <p v-if="analysis.pressure_summary?.trim()" class="pressure-summary">
+            <span class="pressure-summary-label">阶段内部压力</span>
+            <span>{{ analysis.pressure_summary }}</span>
+          </p>
+        </div>
         <div class="consistency-pill" :data-level="analysis.consistency">
           <span>证据一致性</span>
           <strong>{{ analysis.consistency }}</strong>
