@@ -119,7 +119,8 @@ def _chat(
         ],
         "response_format": {"type": "json_object"},
         "thinking": {"type": "enabled"},
-        "reasoning_effort": "max",
+        "reasoning_effort": "high",
+        "max_tokens": 4096,
         "temperature": 0.2,
     }).encode("utf-8")
     request = Request(

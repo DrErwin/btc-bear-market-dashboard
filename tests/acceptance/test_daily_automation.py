@@ -88,7 +88,8 @@ def test_optional_ai_environment_values_can_be_blank(
     assert captured["timeout"] == 300
     assert captured["body"]["model"] == "glm-5.2"
     assert captured["body"]["thinking"] == {"type": "enabled"}
-    assert captured["body"]["reasoning_effort"] == "max"
+    assert captured["body"]["reasoning_effort"] == "high"
+    assert captured["body"]["max_tokens"] == 4096
     user_prompt = captured["body"]["messages"][1]["content"]
     assert "只有触发阈值的指标才能列入支持证据" in user_prompt
     assert "未触发的指标只能列入阻碍、反面证据或待确认条件" in user_prompt
