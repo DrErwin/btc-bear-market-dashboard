@@ -236,7 +236,7 @@ INDICATORS: list[IndicatorDisplay] = [
         ],
     ),
     IndicatorDisplay(
-        "reserve_risk_zscore", "reserve", "Reserve Risk · 周期 z", "辅助", "zscore", "z",
+        "reserve_risk_zscore", "reserve", "Reserve Risk · 周期", "辅助", "zscore", "z",
         description="长期持有信念与价格激励关系的周期归一化视图。",
         formula="z[ log(Reserve Risk), trailing 1460d ]；阈值 = z 的过去周期分位（无前视）",
         source="BRK / Bitview", method="log + 滚动四年 z-score（无前视）",

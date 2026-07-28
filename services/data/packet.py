@@ -14,6 +14,7 @@ packet can never be published.
 from __future__ import annotations
 
 import json
+import math
 import os
 from datetime import date
 from pathlib import Path
@@ -21,6 +22,7 @@ from typing import Any
 
 from ..ai import validator as ai_validator
 from . import packet_display
+from .chart_references import references_for
 from .derive import BOTTOMS
 from .metrics import INDICATOR_CATALOG, ComputedData, IndicatorSpec
 
@@ -146,15 +148,45 @@ def _build_series_entry(ind: IndicatorSpec) -> dict:
         {"date": day.isoformat(), "value": value * scale}
         for day, value in sorted(ind.primary.items())
     ]
+    chart_config = references_for(ind.id)
+    chart_refs = chart_config["references"] if chart_config else ind.references
+    chart_direction = chart_config["direction"] if chart_config else ind.direction
     thresholds = []
-    for ref, display_thr in zip(ind.references, display.thresholds):
+    for ref in chart_refs:
+        label = ref["label"]
+        meaning = next(
+            (item["meaning"] for item in display.thresholds if item["label"] == label),
+            f"指标验证参考线：{label}",
+        )
         thresholds.append({
             "value": ref["value"] * scale,
-            "direction": ind.direction,
-            "label": display_thr["label"],
-            "meaning": display_thr["meaning"],
+            "direction": chart_direction,
+            "label": label,
+            "meaning": meaning,
         })
-    return {"points": points, "thresholds": thresholds}
+
+    # Keep the validation panel's complete line set in the public packet. The
+    # primary line is always first; extra lines retain their id, label, axis,
+    # date coverage and values. Indicator-axis lines use the display scale,
+    # while price-axis lines remain in BTC/USD units.
+    lines = [{
+        "id": "primary",
+        "label": ind.primary_line_label or ind.label,
+        "axis": "indicator",
+        "points": points,
+    }]
+    for line in ind.extra_lines:
+        line_scale = scale if line.axis == "indicator" else 1.0
+        lines.append({
+            "id": line.id,
+            "label": line.label,
+            "axis": line.axis,
+            "points": [
+                {"date": day.isoformat(), "value": value * line_scale}
+                for day, value in sorted(line.series.items())
+            ],
+        })
+    return {"points": points, "thresholds": thresholds, "lines": lines}
 
 
 def _build_bar(canonical_id: str, bar) -> dict:
@@ -333,6 +365,50 @@ def validate_packet(packet: dict) -> None:
             metric_ids = {m["id"] for m in snapshot.get("metrics", []) if isinstance(m, dict)} if isinstance(snapshot, dict) else set()
             if metric_ids and set(series_metrics) != metric_ids:
                 errors.append("series.metrics 的键与 snapshot.metrics 的 id 不一致")
+            for metric_id, entry in series_metrics.items():
+                if not isinstance(entry, dict):
+                    errors.append(f"series.metrics[{metric_id}] 必须是对象")
+                    continue
+                lines = entry.get("lines")
+                if lines is None:
+                    continue  # v0.2.3 packets remain readable.
+                if not isinstance(lines, list) or not lines:
+                    errors.append(f"series.metrics[{metric_id}].lines 必须是非空列表")
+                    continue
+                line_ids: set[str] = set()
+                for line_index, line in enumerate(lines):
+                    if not isinstance(line, dict):
+                        errors.append(f"series.metrics[{metric_id}].lines[{line_index}] 必须是对象")
+                        continue
+                    missing_line = [field for field in ("id", "label", "axis", "points") if field not in line]
+                    if missing_line:
+                        errors.append(
+                            f"series.metrics[{metric_id}].lines[{line_index}] 缺字段: {', '.join(missing_line)}"
+                        )
+                        continue
+                    line_id = line.get("id")
+                    if not isinstance(line_id, str) or not line_id:
+                        errors.append(f"series.metrics[{metric_id}].lines[{line_index}].id 必须是非空字符串")
+                    elif line_id in line_ids:
+                        errors.append(f"series.metrics[{metric_id}].lines 出现重复 id: {line_id}")
+                    else:
+                        line_ids.add(line_id)
+                    if line.get("axis") not in ("indicator", "price"):
+                        errors.append(f"series.metrics[{metric_id}].lines[{line_index}].axis 无效")
+                    points = line.get("points")
+                    if not isinstance(points, list):
+                        errors.append(f"series.metrics[{metric_id}].lines[{line_index}].points 必须是列表")
+                    else:
+                        for point_index, point in enumerate(points):
+                            if (
+                                not isinstance(point, dict)
+                                or not isinstance(point.get("date"), str)
+                                or not isinstance(point.get("value"), (int, float))
+                                or not math.isfinite(float(point["value"]))
+                            ):
+                                errors.append(
+                                    f"series.metrics[{metric_id}].lines[{line_index}].points[{point_index}] 无效"
+                                )
 
     bars = packet.get("bars")
     if not isinstance(bars, dict) or len(bars) != 2:

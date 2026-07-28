@@ -91,6 +91,48 @@ def assert_bar_visual_height(page: Page, kind: str, minimum: int = 90) -> None:
     )
 
 
+def assert_chart_canvas_changes(before_name: str, after_name: str, minimum: int = 120) -> None:
+    """A legend switch must change the rendered chart, not only its button state."""
+    before_path = EVIDENCE / before_name
+    after_path = EVIDENCE / after_name
+    before = Image.open(before_path).convert("RGB")
+    after = Image.open(after_path).convert("RGB")
+    changed = sum(left != right for left, right in zip(before.get_flattened_data(), after.get_flattened_data()))
+    assert changed >= minimum, f"曲线开关应改变图表画布，实际变化像素为 {changed}"
+
+
+def assert_chart_contains_colour(
+    image_name: str,
+    colour: tuple[int, int, int],
+    minimum: int = 30,
+    tolerance: int = 32,
+) -> None:
+    """Check that a required ECharts line is visibly painted on the canvas."""
+    image = Image.open(EVIDENCE / image_name).convert("RGB")
+    red, green, blue = colour
+    matches = sum(
+        abs(pixel[0] - red) <= tolerance and abs(pixel[1] - green) <= tolerance and abs(pixel[2] - blue) <= tolerance
+        for pixel in image.get_flattened_data()
+    )
+    assert matches >= minimum, f"应在图表中看到指定参考线颜色，实际像素为 {matches}"
+
+
+def assert_chart_excludes_colour(
+    image_name: str,
+    colour: tuple[int, int, int],
+    maximum: int = 8,
+    tolerance: int = 16,
+) -> None:
+    """Secondary indicator lines must not silently return to the retired purple."""
+    image = Image.open(EVIDENCE / image_name).convert("RGB")
+    red, green, blue = colour
+    matches = sum(
+        abs(pixel[0] - red) <= tolerance and abs(pixel[1] - green) <= tolerance and abs(pixel[2] - blue) <= tolerance
+        for pixel in image.get_flattened_data()
+    )
+    assert matches <= maximum, f"图表不应出现已淘汰的紫色次要线，实际像素为 {matches}"
+
+
 def success_flow(page: Page) -> None:
     page.set_viewport_size({"width": 1440, "height": 900})
     open_page(page)
@@ -124,7 +166,7 @@ def success_flow(page: Page) -> None:
         "capital": ["Realized Cap Relative NPC · 30d", "aSOPR"],
         "holders": ["HODLer NPC · 30d", "≥155d 花费价值占比", "Seller Exhaustion Constant"],
         "miners": ["Puell Multiple", "Thermocap Multiple · 周期 z"],
-        "anchors": ["CVDD 接近程度", "Reserve Risk · 周期 z"],
+        "anchors": ["CVDD 接近程度", "Reserve Risk · 周期"],
     }
     category_buttons = page.locator(".category-grid .category-card")
     for index, (category_id, metrics) in enumerate(categories.items()):
@@ -141,9 +183,54 @@ def success_flow(page: Page) -> None:
                 assert "阈值线" not in legend_text, "柱状指标不应显示对应的阈值线开关"
                 assert page.locator(".chart-legend .legend-line.indicator").count() == 0
                 assert page.locator(".chart-legend .legend-line.threshold").count() == 0
+            elif metric_label == "STH-MVRV 战术价位":
+                legend_text = page.locator(".chart-legend").inner_text()
+                assert metric_label not in legend_text, "STH-MVRV 主指标线不应保留图例开关"
+                expect(page.locator(".chart-legend")).to_contain_text("5%分位 × STH-RP")
+                expect(page.locator(".chart-legend")).to_contain_text("阈值线")
             else:
                 expect(page.locator(".chart-legend")).to_contain_text(metric_label)
                 expect(page.locator(".chart-legend")).to_contain_text("阈值线")
+
+    # v0.2.4: every validation-panel curve is represented in the shared chart,
+    # and the exported reference names are exposed to the accessible chart
+    # label as well as rendered by ECharts markLine labels.
+    page.get_by_text("估值与成本", exact=True).click()
+    page.locator(".metric-card").filter(has_text="STH-MVRV 战术价位").first.click()
+    sth_aria = page.locator(".shared-chart").get_attribute("aria-label") or ""
+    for label in ("5%分位 × STH-RP", "1.5σ × STH-RP", "1.5·MAD × STH-RP", "1.5·MAD（无前视）"):
+        assert label in sth_aria, f"STH-MVRV 图表缺少曲线/参考线：{label}"
+    assert "STH-MVRV 战术价位（三法合并）" not in sth_aria, "STH-MVRV 主指标线不应参与图表"
+    expect(page.locator(".chart-legend")).to_contain_text("5%分位 × STH-RP")
+
+    page.get_by_text("供应盈亏", exact=True).click()
+    page.locator(".metric-card").filter(has_text="SIPL").first.click()
+    sipl_aria = page.locator(".shared-chart").get_attribute("aria-label") or ""
+    for label in ("Supply in Profit / Loss", "Supply in Loss", "盈利% − 亏损%", "两线理论交错参考"):
+        assert label in sipl_aria, f"SIPL 图表缺少曲线/参考线：{label}"
+
+    page.get_by_text("链上资本流", exact=True).click()
+    page.locator(".metric-card").filter(has_text="aSOPR").first.click()
+    asopr_aria = page.locator(".shared-chart").get_attribute("aria-label") or ""
+    for label in ("aSOPR", "3日滞后均值（趋势辅助）", "7日滞后均值（趋势辅助）", "投降"):
+        assert label in asopr_aria, f"aSOPR 图表缺少曲线/参考线：{label}"
+
+    page.get_by_text("长期成本锚", exact=True).click()
+    page.locator(".metric-card").filter(has_text="CVDD 接近程度").first.click()
+    cvdd_aria = page.locator(".shared-chart").get_attribute("aria-label") or ""
+    for label in ("CVDD 接近程度", "CVDD 价格地板", "高于CVDD 50%"):
+        assert label in cvdd_aria, f"CVDD 图表缺少曲线/参考线：{label}"
+
+    for category_name, metric_label, reference_labels in (
+        ("估值与成本", "MVRV", ("成本平衡线", "深度低估观察线")),
+        ("矿工压力", "Thermocap Multiple", ("z·过去周期10%分位（先触发）", "z·过去周期5%分位（深部）", "自身4年均值（中性）")),
+        ("长期成本锚", "Reserve Risk", ("z·过去周期10%分位", "z·过去周期5%分位")),
+    ):
+        page.get_by_text(category_name, exact=True).click()
+        page.locator(".metric-card").filter(has_text=metric_label).first.click()
+        aria = page.locator(".shared-chart").get_attribute("aria-label") or ""
+        for label in reference_labels:
+            assert label in aria, f"{metric_label} 图表缺少参考线：{label}"
 
     assert_no_restricted_language(page)
     page.screenshot(path=str(EVIDENCE / "desktop-success.png"), full_page=True)
@@ -276,6 +363,81 @@ def chart_interaction_flow(page: Page) -> None:
     assert page.locator(".chart-resize-handle").get_attribute("aria-valuenow") == "420", "非法高度应回到默认值"
 
 
+def chart_curve_toggle_flow(page: Page) -> None:
+    """v0.2.4 final controls: hide STH primary; group SIPL; split aSOPR."""
+    page.set_viewport_size({"width": 1440, "height": 900})
+    open_page(page)
+
+    page.get_by_text("估值与成本", exact=True).click()
+    page.locator(".metric-card").filter(has_text="STH-MVRV 战术价位").first.click()
+    sth_legend = page.locator(".chart-legend")
+    sth_text = sth_legend.inner_text()
+    assert "STH-MVRV 战术价位" not in sth_text, "STH-MVRV 主线不应保留图例开关"
+    for label in ("5%分位 × STH-RP", "1.5σ × STH-RP", "1.5·MAD × STH-RP"):
+        expect(sth_legend.get_by_role("button", name=label, exact=True)).to_be_visible()
+    page.locator(".shared-chart").screenshot(path=str(EVIDENCE / "v024-sth-primary-hidden.png"))
+    assert_chart_contains_colour("v024-sth-primary-hidden.png", (222, 138, 87))
+    for colour in ((214, 93, 82), (78, 155, 115), (93, 143, 203)):
+        assert_chart_contains_colour("v024-sth-primary-hidden.png", colour)
+    assert_chart_excludes_colour("v024-sth-primary-hidden.png", (167, 122, 194))
+
+    page.get_by_text("供应盈亏", exact=True).click()
+    page.locator(".metric-card").filter(has_text="SIPL").first.click()
+    sipl_legend = page.locator(".chart-legend")
+    sipl_pair = sipl_legend.get_by_role("button", name="SIPL", exact=True)
+    sipl_gap = sipl_legend.get_by_role("button", name="SIPL 差值", exact=True)
+    expect(sipl_pair).to_have_attribute("aria-pressed", "true")
+    expect(sipl_gap).to_have_attribute("aria-pressed", "true")
+    assert sipl_legend.get_by_role("button", name="Supply in Loss", exact=True).count() == 0
+    page.locator(".shared-chart").screenshot(path=str(EVIDENCE / "sipl-pair-before.png"))
+    sipl_pair.focus()
+    sipl_pair.press("Space")
+    expect(sipl_pair).to_have_attribute("aria-pressed", "false")
+    expect(sipl_gap).to_have_attribute("aria-pressed", "true")
+    page.wait_for_timeout(150)
+    page.locator(".shared-chart").screenshot(path=str(EVIDENCE / "sipl-pair-after.png"))
+    assert_chart_canvas_changes("sipl-pair-before.png", "sipl-pair-after.png")
+    sipl_pair.press("Space")
+    expect(sipl_pair).to_have_attribute("aria-pressed", "true")
+    page.locator(".shared-chart").screenshot(path=str(EVIDENCE / "sipl-gap-before.png"))
+    sipl_gap.click()
+    expect(sipl_pair).to_have_attribute("aria-pressed", "true")
+    expect(sipl_gap).to_have_attribute("aria-pressed", "false")
+    page.wait_for_timeout(150)
+    page.locator(".shared-chart").screenshot(path=str(EVIDENCE / "sipl-gap-after.png"))
+    assert_chart_canvas_changes("sipl-gap-before.png", "sipl-gap-after.png")
+
+    page.get_by_text("链上资本流", exact=True).click()
+    page.locator(".metric-card").filter(has_text="aSOPR").first.click()
+    asopr_legend = page.locator(".chart-legend")
+    asopr = asopr_legend.get_by_role("button", name="aSOPR", exact=True)
+    asopr_3d = asopr_legend.get_by_role("button", name="3日滞后均值（趋势辅助）", exact=True)
+    asopr_7d = asopr_legend.get_by_role("button", name="7日滞后均值（趋势辅助）", exact=True)
+    for control in (asopr, asopr_3d, asopr_7d):
+        expect(control).to_have_attribute("aria-pressed", "true")
+    page.locator(".shared-chart").screenshot(path=str(EVIDENCE / "asopr-3d-before.png"))
+    for colour in ((214, 93, 82), (78, 155, 115)):
+        assert_chart_contains_colour("asopr-3d-before.png", colour)
+    assert_chart_excludes_colour("asopr-3d-before.png", (167, 122, 194))
+    page.get_by_role("button", name="1 年", exact=True).click()
+    page.wait_for_timeout(150)
+    page.locator(".shared-chart").screenshot(path=str(EVIDENCE / "v024-asopr-adaptive-axis-1y.png"))
+    asopr_3d.click()
+    expect(asopr).to_have_attribute("aria-pressed", "true")
+    expect(asopr_3d).to_have_attribute("aria-pressed", "false")
+    expect(asopr_7d).to_have_attribute("aria-pressed", "true")
+    page.wait_for_timeout(150)
+    page.locator(".shared-chart").screenshot(path=str(EVIDENCE / "asopr-3d-after.png"))
+    assert_chart_canvas_changes("asopr-3d-before.png", "asopr-3d-after.png")
+
+    page.get_by_text("长期成本锚", exact=True).click()
+    page.locator(".metric-card").filter(has_text="Reserve Risk").first.click()
+    expect(page.locator("#chart-title")).to_have_text("Reserve Risk · 周期")
+    reserve_aria = page.locator(".shared-chart").get_attribute("aria-label") or ""
+    assert "Reserve Risk · 周期归一化 z" not in reserve_aria
+    page.screenshot(path=str(EVIDENCE / "v024-curve-toggle-controls.png"), full_page=True)
+
+
 def ai_contract_flow() -> None:
     result = pytest.main(
         [
@@ -283,6 +445,7 @@ def ai_contract_flow() -> None:
             str(ROOT / "tests" / "acceptance" / "test_ai_contract.py"),
             str(ROOT / "tests" / "acceptance" / "test_input_boundary.py"),
             str(ROOT / "tests" / "acceptance" / "test_packet_contract.py"),
+            str(ROOT / "tests" / "acceptance" / "test_v024_chart_data.py"),
         ]
     )
     if result != pytest.ExitCode.OK:
@@ -308,6 +471,7 @@ def main() -> int:
             page = browser.new_page()
             success_flow(page)
             chart_interaction_flow(page)
+            chart_curve_toggle_flow(page)
             failure_flow(page)
             responsive_and_keyboard_flow(page)
             browser.close()

@@ -10,8 +10,21 @@ import {
 } from "echarts/components";
 import { BarChart, LineChart } from "echarts/charts";
 import VChart from "vue-echarts";
-import type { BarSeries, BottomMark, Metric, SeriesData } from "../types";
-import { useChartOption, type ChartVisibility, type ZoomRange } from "../composables/useChartOption";
+import {
+  chartLineColor,
+  chartLineVisibilityKey,
+  getChartLineDisplayLabel,
+  getDedicatedChartLineToggleGroups,
+  getRenderableChartLines,
+  hasDedicatedChartLineControls,
+  isChartLineGroupVisible,
+  isChartLineVisible,
+  toggleChartLineGroup,
+  type ChartVisibility,
+  type ResolvedChartLineToggleGroup,
+} from "../chartLineControls";
+import type { BarSeries, BottomMark, Metric, MetricLine, SeriesData } from "../types";
+import { useChartOption, type ZoomRange } from "../composables/useChartOption";
 import { tierClass } from "../utils/tier";
 
 use([
@@ -94,8 +107,49 @@ const visibility = ref<ChartVisibility>({
   bottoms: true,
   hodler: true,
   spent: true,
+  lines: {},
 });
 const option = useChartOption(metricRef, seriesRef, barsRef, zoom, bottomsRef, logPrice, visibility);
+
+const sourceChartLines = computed<MetricLine[]>(() => {
+  const metricSeries = props.series.metrics[props.metric.id];
+  return metricSeries?.lines?.length
+    ? metricSeries.lines
+    : [{ id: "primary", label: props.metric.label, axis: "indicator", points: metricSeries?.points ?? [] }];
+});
+const chartLines = computed(() => getRenderableChartLines(props.metric.id, sourceChartLines.value));
+const extraChartLines = computed(() => chartLines.value.filter((line) => line.id !== "primary"));
+const hasDedicatedLineControls = computed(() => hasDedicatedChartLineControls(props.metric.id));
+const dedicatedLineToggleGroups = computed(() => getDedicatedChartLineToggleGroups(props.metric.id, chartLines.value));
+const showDefaultIndicatorToggle = computed(() => !hasDedicatedLineControls.value
+  && chartLines.value.some((line) => line.id === "primary" && line.axis === "indicator"));
+function lineVisibilityKey(line: MetricLine) {
+  return chartLineVisibilityKey(props.metric.id, line.id);
+}
+function isLineVisible(line: MetricLine) {
+  return isChartLineVisible(props.metric.id, line, visibility.value);
+}
+function toggleLine(line: MetricLine) {
+  const key = lineVisibilityKey(line);
+  visibility.value.lines[key] = !isLineVisible(line);
+}
+function isLineGroupVisible(group: ResolvedChartLineToggleGroup) {
+  return isChartLineGroupVisible(props.metric.id, group.lines, visibility.value);
+}
+function toggleLineGroup(group: ResolvedChartLineToggleGroup) {
+  toggleChartLineGroup(props.metric.id, group.lines, visibility.value);
+}
+function lineColor(line: MetricLine | undefined) {
+  if (!line) return "#e2a06e";
+  return chartLineColor(
+    line,
+    chartLines.value.findIndex((candidate) => candidate.id === line.id),
+    chartLines.value.some((candidate) => candidate.id === "primary"),
+  );
+}
+function lineDisplayLabel(line: MetricLine) {
+  return getChartLineDisplayLabel(props.metric, line);
+}
 
 // Each bar metric owns one series: HODLer and >=155d are separate views.
 const showHodlerBar = computed(() => props.metric.id === "hodler");
@@ -104,7 +158,10 @@ const isBarMetric = computed(() => showHodlerBar.value || showSpentBar.value);
 const chartAriaLabel = computed(() => {
   if (showHodlerBar.value) return "BTC 价格、HODLer 柱状图、历史熊底共享图表";
   if (showSpentBar.value) return "BTC 价格、≥155d 柱状图、历史熊底共享图表";
-  return `BTC 价格、${props.metric.label}与阈值线、历史熊底共享图表`;
+  const metricSeries = props.series.metrics[props.metric.id];
+  const references = metricSeries?.thresholds.map((threshold) => threshold.label).join("、") || "无";
+  const lines = chartLines.value.map((line) => lineDisplayLabel(line)).join("、");
+  return `BTC 价格、${props.metric.label}与阈值线、历史熊底共享图表；参考线：${references}；曲线：${lines}`;
 });
 
 interface RangeOption {
@@ -319,7 +376,34 @@ onBeforeUnmount(() => {
     <div class="chart-legend" role="group" aria-label="图例与曲线开关">
       <button type="button" class="legend-toggle" :class="{ 'is-off': !visibility.price }" :aria-pressed="visibility.price" @click="visibility.price = !visibility.price"><i class="legend-line price"></i>BTC 价格</button>
       <template v-if="!isBarMetric">
-        <button type="button" class="legend-toggle" :class="{ 'is-off': !visibility.indicator }" :aria-pressed="visibility.indicator" @click="visibility.indicator = !visibility.indicator"><i class="legend-line indicator"></i>{{ metric.label }}</button>
+        <template v-if="hasDedicatedLineControls">
+          <button
+            v-for="group in dedicatedLineToggleGroups"
+            :key="group.id"
+            type="button"
+            class="legend-toggle legend-line-toggle"
+            :class="{ 'is-off': !isLineGroupVisible(group) }"
+            :aria-pressed="isLineGroupVisible(group)"
+            :data-line-control="group.id"
+            @click="toggleLineGroup(group)"
+          >
+            <i class="legend-line extra" :style="{ backgroundColor: lineColor(group.lines[0]) }"></i>{{ group.label }}
+          </button>
+        </template>
+        <template v-else>
+          <button v-if="showDefaultIndicatorToggle" type="button" class="legend-toggle" :class="{ 'is-off': !visibility.indicator }" :aria-pressed="visibility.indicator" @click="visibility.indicator = !visibility.indicator"><i class="legend-line indicator"></i>{{ metric.label }}</button>
+          <button
+            v-for="line in extraChartLines"
+            :key="line.id"
+            type="button"
+            class="legend-toggle legend-line-toggle"
+            :class="{ 'is-off': !isLineVisible(line) }"
+            :aria-pressed="isLineVisible(line)"
+            @click="toggleLine(line)"
+          >
+            <i class="legend-line extra" :style="{ backgroundColor: lineColor(line) }"></i>{{ lineDisplayLabel(line) }}
+          </button>
+        </template>
         <button type="button" class="legend-toggle" :class="{ 'is-off': !visibility.thresholds }" :aria-pressed="visibility.thresholds" @click="visibility.thresholds = !visibility.thresholds"><i class="legend-line threshold"></i>阈值线</button>
       </template>
       <button type="button" class="legend-toggle" :class="{ 'is-off': !visibility.bottoms }" :aria-pressed="visibility.bottoms" @click="visibility.bottoms = !visibility.bottoms"><i class="legend-line bottom"></i>历史熊底</button>

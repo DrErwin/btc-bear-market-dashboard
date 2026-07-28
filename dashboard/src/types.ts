@@ -58,9 +58,20 @@ export interface SeriesPoint {
   value: number;
 }
 
+export type MetricLineAxis = "indicator" | "price";
+
+export interface MetricLine {
+  id: string;
+  label: string;
+  axis: MetricLineAxis;
+  points: SeriesPoint[];
+}
+
 export interface MetricSeries {
   points: SeriesPoint[];
   thresholds: Threshold[];
+  /** Every visible validation-panel curve, including the primary line. */
+  lines?: MetricLine[];
 }
 
 export interface SeriesData {

@@ -9,6 +9,7 @@
 | `v0.2.1` | 已实现 | [需求](v0.2.1/requirements.md) · [实现记录](v0.2.1/implementation-record.md) | 折叠左侧指标列、tier 三档红系配色、图表时间轴/缩放/十字、熊底虚线、价格对数坐标、柱状图按指标 id、核心/辅助标签配色。 |
 | `v0.2.2` | 已实现 | [需求](v0.2.2/requirements.md) · [实现记录](v0.2.2/implementation-record.md) | 删除多余 eyebrow、修复图表内拖动平移时间窗、曲线开关合并进四项图例、纵坐标自适应时阈值线始终可见。 |
 | `v0.2.3` | 已实现 | [需求](v0.2.3/requirements.md) · [实现记录](v0.2.3/implementation-record.md) | 图表高度可拖动并记忆、柱状图单绘图区底部叠加、删除图表说明、观察区改为文字颜色。 |
+| `v0.2.4` | 已实现 | [需求](v0.2.4/requirements.md) · [实现记录](v0.2.4/implementation-record.md) | 以指标验证导出与时间线为依据，同步参考线、名称、多曲线和 3 日／7 日平滑线。 |
 
 ## 版本规则
 

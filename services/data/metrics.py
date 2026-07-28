@@ -387,7 +387,7 @@ def compute_indicators(
             extra_lines=[LineSpec("cvdd", "CVDD 价格地板", "price", cvdd)],
         ),
         spec(
-            "reserve_risk_zscore", label="Reserve Risk · 周期归一化 z", unit="zscore",
+            "reserve_risk_zscore", label="Reserve Risk · 周期", unit="zscore",
             description="Reserve Risk 经 log + 4年滚动 z-score，消除分母 HODL Bank 累积导致的结构性下移，使各轮周期顶/底可比。",
             formula="z[ log(Reserve Risk), trailing 1460d ]；阈值 = z 的过去周期分位（无前视）",
             source="BRK / Bitview", method="自行计算（无前视）",

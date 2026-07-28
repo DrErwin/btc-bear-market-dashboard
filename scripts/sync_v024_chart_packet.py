@@ -1,0 +1,113 @@
+"""Sync v0.2.4 validation references and line data into fixed dashboard packets.
+
+This is a repeatable fixture-generation step. It reads the exact validation
+export and timeline source, then changes only ``series.metrics``; the snapshot
+thresholds remain the AI/input boundary from the existing packet.
+"""
+
+from __future__ import annotations
+
+import hashlib
+import json
+from pathlib import Path
+
+
+ROOT = Path(__file__).resolve().parents[1]
+DATA_DIR = ROOT / "dashboard" / "public" / "data"
+TIMELINE_PATH = ROOT / "prototype-indicator-timeline" / "timeline-data.json"
+CONFIG_PATH = Path(r"C:\Users\57652\Downloads\btc-indicator-config-2026-07-28.json")
+CONFIG_SHA256 = "CAD0028AF77A30065A42D0C47181DEB8256434DC2410C4B2128391D4477EBC98"
+TIMELINE_SHA256 = "15C6FF03ABDD0663F9357BC8675D670C637C4F15574236915CBC5B48D6FA163A"
+
+DISPLAY_TO_SOURCE = {
+    "mvrv": "mvrv",
+    "aviv": "aviv",
+    "sth-mvrv": "sth_mvrv_price",
+    "psip": "psip",
+    "sipl": "sipl",
+    "rup": "relative_unrealized_profit",
+    "rul-z": "relative_unrealized_loss_zscore_4y",
+    "rc-npc": "realized_cap_relative_npc_30d",
+    "asopr": "asopr",
+    "hodler": "hodler_npc_30d",
+    "spent155": "spent_value_ge155d_share",
+    "seller": "seller_exhaustion",
+    "puell": "puell_multiple",
+    "thermo": "thermocap_multiple_zscore",
+    "cvdd": "cvdd_proximity",
+    "reserve": "reserve_risk_zscore",
+}
+
+# This is a dashboard display-name override requested after the validation
+# export. It does not rename the raw validation line or alter its z-score data.
+DISPLAY_LABEL_OVERRIDES = {
+    "reserve": "Reserve Risk · 周期",
+}
+
+
+def _load_sources() -> tuple[dict, dict[str, dict]]:
+    if not CONFIG_PATH.exists():
+        raise FileNotFoundError(f"缺少指标验证导出：{CONFIG_PATH}")
+    digest = hashlib.sha256(CONFIG_PATH.read_bytes()).hexdigest().upper()
+    if digest != CONFIG_SHA256:
+        raise ValueError(f"指标验证导出 SHA-256 不匹配：{digest}")
+    timeline_digest = hashlib.sha256(TIMELINE_PATH.read_bytes()).hexdigest().upper()
+    if timeline_digest != TIMELINE_SHA256:
+        raise ValueError(f"指标验证时间线 SHA-256 不匹配：{timeline_digest}")
+    config = json.loads(CONFIG_PATH.read_text(encoding="utf-8"))
+    timeline = json.loads(TIMELINE_PATH.read_text(encoding="utf-8"))
+    return config, {metric["id"]: metric for metric in timeline["metrics"]}
+
+
+def _sync_packet(path: Path, config: dict, timeline_by_id: dict[str, dict]) -> None:
+    packet = json.loads(path.read_text(encoding="utf-8"))
+    snapshot_by_id = {metric["id"]: metric for metric in packet["snapshot"]["metrics"]}
+
+    for display_id, label in DISPLAY_LABEL_OVERRIDES.items():
+        snapshot_by_id[display_id]["label"] = label
+
+    for display_id, source_id in DISPLAY_TO_SOURCE.items():
+        entry = packet["series"]["metrics"][display_id]
+        snapshot = snapshot_by_id[display_id]
+        scale = 100 if snapshot["unit"] == "%" else 1
+        exported = config["metrics"][source_id]
+        old_thresholds = entry.get("thresholds", [])
+        meanings = {item.get("label"): item.get("meaning") for item in old_thresholds}
+        entry["thresholds"] = [
+            {
+                "value": reference["value"] * scale,
+                "direction": exported["direction"],
+                "label": reference["label"],
+                "meaning": meanings.get(reference["label"])
+                or f"指标验证参考线：{reference['label']}",
+            }
+            for reference in exported["references"]
+        ]
+
+        lines = []
+        for source_line in timeline_by_id[source_id]["lines"]:
+            line_scale = scale if source_line["axis"] == "indicator" else 1
+            lines.append({
+                "id": source_line["id"],
+                "label": source_line["label"],
+                "axis": source_line["axis"],
+                "points": [
+                    {"date": day, "value": value * line_scale}
+                    for day, value in source_line["series"]
+                ],
+            })
+        entry["lines"] = lines
+
+    path.write_text(json.dumps(packet, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
+
+
+def main() -> int:
+    config, timeline_by_id = _load_sources()
+    for name in ("packet.json", "packet-failure.json", "packet-no-fallback.json"):
+        _sync_packet(DATA_DIR / name, config, timeline_by_id)
+        print(f"synced {name}")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

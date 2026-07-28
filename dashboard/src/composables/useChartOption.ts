@@ -1,18 +1,18 @@
 import { computed, type Ref } from "vue";
-import type { BarSeries, BottomMark, Metric, MetricSeries, SeriesData } from "../types";
+import {
+  chartLineColor,
+  getChartLineDisplayLabel,
+  getRenderableChartLines,
+  isChartLineVisible,
+  type ChartVisibility,
+} from "../chartLineControls";
+import type { BarSeries, BottomMark, Metric, MetricLine, MetricSeries, SeriesData } from "../types";
+
+export type { ChartVisibility } from "../chartLineControls";
 
 export interface ZoomRange {
   start: number; // 0..100 (percent)
   end: number; // 0..100 (percent)
-}
-
-export interface ChartVisibility {
-  price: boolean;
-  indicator: boolean;
-  thresholds: boolean;
-  bottoms: boolean;
-  hodler: boolean;
-  spent: boolean;
 }
 
 const BAR_METRIC_IDS = ["hodler", "spent155"];
@@ -21,6 +21,10 @@ const BAR_SERIES_KEYS = {
   spent155: "spent_value_ge155d_share",
 } as const;
 const BAR_HEIGHT_FRACTION = 0.4;
+const PRICE_LINE_WIDTH = 1.35;
+const PRIMARY_INDICATOR_LINE_WIDTH = 1.2;
+const SECONDARY_INDICATOR_LINE_WIDTH = 1;
+const REFERENCE_LINE_WIDTH = 0.8;
 
 /**
  * Shared-chart option.
@@ -60,8 +64,18 @@ export function useChartOption(
       points: [],
       thresholds: metric.value.thresholds,
     };
-    const indicatorByDate = new Map(metricSeries.points.map((point) => [point.date, point.value]));
-    const indicatorValues = dates.map((date) => indicatorByDate.get(date) ?? null);
+    const sourceMetricLines: MetricLine[] = metricSeries.lines?.length
+      ? metricSeries.lines
+      : [{ id: "primary", label: metric.value.label, axis: "indicator", points: metricSeries.points }];
+    const metricLines = getRenderableChartLines(metric.value.id, sourceMetricLines);
+    const hasPrimaryLine = metricLines.some((line) => line.id === "primary");
+    const lineValuesById = new Map(
+      metricLines.map((line) => {
+        const valuesByDate = new Map(line.points.map((point) => [point.date, point.value]));
+        return [line.id, dates.map((date) => valuesByDate.get(date) ?? null)] as const;
+      }),
+    );
+    const vis = visibility.value;
 
     // Each holder-capitulation metric owns one bar series: HODLer shows only
     // HODLer NPC, while >=155d shows only spent-value share.
@@ -78,22 +92,33 @@ export function useChartOption(
     // Visible slice for y-axis auto-fit.
     const startIdx = Math.max(0, Math.floor((zoom.value.start / 100) * n));
     const endIdx = Math.min(n, Math.ceil((zoom.value.end / 100) * n));
-    const priceBounds = bounds(pricePoints.slice(startIdx, endIdx).map((p) => p.value));
-    // Indicator y-axis must always cover the threshold values, otherwise the
-    // horizontal threshold markLines fall outside the auto-fit range and vanish
-    // on slices whose data is far from the threshold (v0.2.2 #4).
-    const indBounds = bounds([
-      ...indicatorValues.slice(startIdx, endIdx),
-      ...metricSeries.thresholds.map((threshold) => threshold.value),
-    ]);
-    const hodlerBounds = showHodlerBar ? compressedBarBounds(hodlerValues.slice(startIdx, endIdx)) : { min: 0, max: 1 };
-    const spentBounds = showSpentBar ? compressedBarBounds(spentValues.slice(startIdx, endIdx)) : { min: 0, max: 1 };
+    const lineValues = (axis: MetricLine["axis"]) => metricLines
+      .filter((line) => line.axis === axis)
+      .flatMap((line) => (lineValuesById.get(line.id) ?? []).slice(startIdx, endIdx));
+    const priceValues = [
+      ...pricePoints.slice(startIdx, endIdx).map((point) => point.value),
+      ...lineValues("price").filter((value): value is number => value !== null && Number.isFinite(value) && value > 0),
+    ];
+    const priceBounds = bounds(priceValues);
+    const thresholdValues = metricSeries.thresholds.map((threshold) => threshold.value);
+    // Mirror the indicator-validation dashboard: fit the visible indicator
+    // range to its robust 2%–98% values, while always keeping every configured
+    // threshold visible. This lets normal movement remain readable when an
+    // old outlier would otherwise flatten the line.
+    const indBounds = adaptiveIndicatorBounds(lineValues("indicator"), thresholdValues);
+    const thresholdAnchorLine = metricLines.find((line) => line.axis === "indicator");
+    const hodlerBounds = showHodlerBar
+      ? compressedBarBounds(hodlerValues.slice(startIdx, endIdx), thresholdValues)
+      : { min: 0, max: 1 };
+    const spentBounds = showSpentBar
+      ? compressedBarBounds(spentValues.slice(startIdx, endIdx), thresholdValues)
+      : { min: 0, max: 1 };
 
     // Horizontal threshold lines + vertical bear-bottom lines, merged on the indicator series.
     const thresholdLines = metricSeries.thresholds.map((threshold) => ({
       yAxis: threshold.value,
       name: threshold.label,
-      lineStyle: { color: "#de8a57", type: "dashed" as const, width: 1 },
+      lineStyle: { color: "#de8a57", type: "dashed" as const, width: REFERENCE_LINE_WIDTH },
       label: {
         show: true,
         formatter: threshold.label,
@@ -106,7 +131,7 @@ export function useChartOption(
     const bottomLines = bottoms.value.map((bottom) => ({
       xAxis: bottom.date,
       name: bottom.label,
-      lineStyle: { color: "#5a7a86", type: "dashed" as const, width: 1 },
+      lineStyle: { color: "#5a7a86", type: "dashed" as const, width: REFERENCE_LINE_WIDTH },
       label: {
         show: true,
         formatter: bottom.label,
@@ -116,8 +141,6 @@ export function useChartOption(
         padding: [3, 5],
       },
     }));
-
-    const vis = visibility.value;
 
     // One plot area keeps the active bar series inside the main chart. Its
     // right-side axis uses an expanded range so bars occupy the lower band
@@ -207,7 +230,7 @@ export function useChartOption(
         showSymbol: false,
         smooth: true,
         data: pricePoints.map((p) => p.value),
-        lineStyle: { width: 2, color: "#9bc0b8", opacity: vis.price ? 1 : 0 },
+        lineStyle: { width: PRICE_LINE_WIDTH, color: "#9bc0b8", opacity: vis.price ? 1 : 0 },
         areaStyle: { color: "rgba(155, 192, 184, 0.08)", opacity: vis.price ? 1 : 0 },
         markLine: {
           symbol: ["none", "none"],
@@ -217,23 +240,58 @@ export function useChartOption(
       },
     ];
     if (!isBarMetric) {
-      seriesArr.push({
-        name: metric.value.label,
-        type: "line",
-        xAxisIndex: 0,
-        yAxisIndex: 1,
-        showSymbol: false,
-        smooth: true,
-        connectNulls: true,
-        data: indicatorValues,
-        lineStyle: { width: 2, color: "#e2a06e", opacity: vis.indicator ? 1 : 0 },
-        // Thresholds remain independently switchable for line metrics.
-        markLine: {
-          symbol: ["none", "none"],
-          silent: true,
-          data: vis.thresholds ? thresholdLines : [],
-        },
+      metricLines.forEach((line, index) => {
+        const values = lineValuesById.get(line.id) ?? dates.map(() => null);
+        const indicatorLine = line.axis === "indicator";
+        const lineVisible = isChartLineVisible(metric.value.id, line, vis);
+        const color = chartLineColor(line, index, hasPrimaryLine);
+        seriesArr.push({
+          name: getChartLineDisplayLabel(metric.value, line),
+          type: "line",
+          xAxisIndex: 0,
+          yAxisIndex: indicatorLine ? 1 : 0,
+          showSymbol: false,
+          smooth: true,
+          connectNulls: false,
+          data: values,
+          lineStyle: {
+            width: line.id === "primary" ? PRIMARY_INDICATOR_LINE_WIDTH : SECONDARY_INDICATOR_LINE_WIDTH,
+            color,
+            type: "solid",
+            opacity: lineVisible ? 1 : 0,
+          },
+          itemStyle: { color },
+          // Thresholds belong to the indicator axis and are drawn once on the
+          // primary line, so extra curves do not duplicate the labels.
+          markLine: {
+            symbol: ["none", "none"],
+            silent: true,
+            data: indicatorLine && line.id === thresholdAnchorLine?.id && vis.thresholds ? thresholdLines : [],
+          },
+        });
       });
+      // STH-MVRV intentionally hides its indicator curve but keeps its
+      // indicator-axis reference line. This invisible anchor owns only that
+      // markLine, so it cannot appear in the tooltip or chart legend.
+      if (!thresholdAnchorLine && metricSeries.thresholds.length) {
+        seriesArr.push({
+          name: "__threshold_anchor",
+          type: "line",
+          xAxisIndex: 0,
+          yAxisIndex: 1,
+          data: dates.map(() => null),
+          showSymbol: false,
+          silent: true,
+          tooltip: { show: false },
+          lineStyle: { opacity: 0 },
+          itemStyle: { opacity: 0 },
+          markLine: {
+            symbol: ["none", "none"],
+            silent: true,
+            data: vis.thresholds ? thresholdLines : [],
+          },
+        });
+      }
     }
     if (showHodlerBar) {
       seriesArr.push({
@@ -247,6 +305,11 @@ export function useChartOption(
         barCategoryGap: "40%",
         z: 1,
         itemStyle: { color: "#c98a5d", opacity: vis.hodler ? 0.45 : 0 },
+        markLine: {
+          symbol: ["none", "none"],
+          silent: true,
+          data: vis.thresholds ? thresholdLines : [],
+        },
       });
     }
     if (showSpentBar) {
@@ -261,6 +324,11 @@ export function useChartOption(
         barCategoryGap: "40%",
         z: 2,
         itemStyle: { color: "#7fa6c0", opacity: vis.spent ? 0.6 : 0 },
+        markLine: {
+          symbol: ["none", "none"],
+          silent: true,
+          data: vis.thresholds ? thresholdLines : [],
+        },
       });
     }
 
@@ -311,12 +379,42 @@ export function useChartOption(
   });
 }
 
-function compressedBarBounds(values: (number | null)[]): { min: number; max: number } {
-  const base = bounds(values);
+function compressedBarBounds(values: (number | null)[], thresholds: number[] = []): { min: number; max: number } {
+  const base = bounds([...values, ...thresholds]);
   const min = Math.min(0, base.min);
   const max = Math.max(0, base.max);
   const span = Math.max(max - min, 1);
   return { min, max: min + span / BAR_HEIGHT_FRACTION };
+}
+
+function adaptiveIndicatorBounds(
+  values: (number | null)[],
+  thresholdValues: number[],
+): { min: number; max: number } {
+  const sortedValues = values
+    .filter((value): value is number => value !== null && Number.isFinite(value))
+    .sort((left, right) => left - right);
+  const finiteThresholds = thresholdValues.filter((value) => Number.isFinite(value));
+
+  if (!sortedValues.length) return bounds(finiteThresholds);
+
+  const quantile = (items: number[], probability: number): number => {
+    const index = Math.min(
+      items.length - 1,
+      Math.max(0, Math.round((items.length - 1) * probability)),
+    );
+    return items[index];
+  };
+
+  let minimum = quantile(sortedValues, 0.02);
+  let maximum = quantile(sortedValues, 0.98);
+  for (const value of finiteThresholds) {
+    minimum = Math.min(minimum, value);
+    maximum = Math.max(maximum, value);
+  }
+
+  const span = maximum - minimum || Math.max(Math.abs(maximum), 1) * 0.1;
+  return { min: minimum - span * 0.08, max: maximum + span * 0.08 };
 }
 
 function bounds(values: (number | null)[]): { min: number; max: number } {
