@@ -1,0 +1,21 @@
+{
+  "schema_version": "0.3.0",
+  "indicators": [
+    {"canonical_id": "mvrv", "display_id": "mvrv", "role": "core_anchor", "judgment_status": "current", "theme_id": "valuation", "eligible_for_judgment": true},
+    {"canonical_id": "aviv", "display_id": "aviv", "role": "core_confirmation", "judgment_status": "current", "theme_id": "valuation", "eligible_for_judgment": true},
+    {"canonical_id": "sth_mvrv_price", "display_id": "sth-mvrv", "role": "auxiliary", "judgment_status": "current", "theme_id": "recovery_absorption", "eligible_for_judgment": true},
+    {"canonical_id": "psip", "display_id": "psip", "role": "auxiliary", "judgment_status": "current", "theme_id": "supply_loss", "eligible_for_judgment": true},
+    {"canonical_id": "sipl", "display_id": "sipl", "role": "auxiliary", "judgment_status": "current", "theme_id": "supply_loss", "eligible_for_judgment": true},
+    {"canonical_id": "relative_unrealized_profit", "display_id": "rup", "role": "auxiliary", "judgment_status": "current", "theme_id": "supply_loss", "eligible_for_judgment": true},
+    {"canonical_id": "relative_unrealized_loss_zscore_4y", "display_id": "rul-z", "role": "strong_auxiliary", "judgment_status": "current", "theme_id": "supply_loss", "eligible_for_judgment": true},
+    {"canonical_id": "realized_cap_relative_npc_30d", "display_id": "rc-npc", "role": "auxiliary", "judgment_status": "current", "theme_id": "recovery_absorption", "eligible_for_judgment": true},
+    {"canonical_id": "asopr", "display_id": "asopr", "role": "strong_auxiliary", "judgment_status": "current", "theme_id": "realized_loss", "eligible_for_judgment": true},
+    {"canonical_id": "hodler_npc_30d", "display_id": "hodler", "role": "auxiliary", "judgment_status": "display_only", "theme_id": "holder_behavior", "eligible_for_judgment": false},
+    {"canonical_id": "spent_value_ge155d_share", "display_id": "spent155", "role": "auxiliary", "judgment_status": "display_only", "theme_id": "holder_behavior", "eligible_for_judgment": false},
+    {"canonical_id": "seller_exhaustion", "display_id": "seller", "role": "strong_auxiliary", "judgment_status": "current", "theme_id": "seller_exhaustion", "eligible_for_judgment": true},
+    {"canonical_id": "puell_multiple", "display_id": "puell", "role": "core_anchor", "judgment_status": "current", "theme_id": "miner_pressure", "eligible_for_judgment": true},
+    {"canonical_id": "thermocap_multiple_zscore", "display_id": "thermo", "role": "auxiliary", "judgment_status": "current", "theme_id": "miner_pressure", "eligible_for_judgment": true},
+    {"canonical_id": "cvdd_proximity", "display_id": "cvdd", "role": "strong_auxiliary", "judgment_status": "validation_pending", "theme_id": "long_term_anchor", "eligible_for_judgment": false},
+    {"canonical_id": "reserve_risk_zscore", "display_id": "reserve", "role": "auxiliary", "judgment_status": "current", "theme_id": "long_term_anchor", "eligible_for_judgment": true}
+  ]
+}

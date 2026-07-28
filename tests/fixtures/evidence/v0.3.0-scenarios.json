@@ -1,0 +1,268 @@
+{
+  "schema_version": "0.3.0",
+  "analysis_date": "2026-07-28",
+  "metric_templates": {
+    "mvrv": {
+      "label": "MVRV",
+      "current_value": 1.1,
+      "metric_date": "2026-07-28",
+      "judgment_status": "current",
+      "eligible_for_judgment": true,
+      "threshold_state": "none"
+    },
+    "aviv": {
+      "label": "AVIV",
+      "current_value": 1.1,
+      "metric_date": "2026-07-28",
+      "judgment_status": "current",
+      "eligible_for_judgment": true,
+      "threshold_state": "none"
+    },
+    "sth_mvrv_price": {
+      "label": "STH-MVRV 战术价位",
+      "current_value": 1.0,
+      "metric_date": "2026-07-28",
+      "judgment_status": "current",
+      "eligible_for_judgment": true,
+      "threshold_state": "neutral"
+    },
+    "psip": {
+      "label": "PSIP",
+      "current_value": 0.6,
+      "metric_date": "2026-07-28",
+      "judgment_status": "current",
+      "eligible_for_judgment": true,
+      "threshold_state": "neutral"
+    },
+    "sipl": {
+      "label": "SIPL",
+      "current_value": 0.2,
+      "metric_date": "2026-07-28",
+      "judgment_status": "current",
+      "eligible_for_judgment": true,
+      "threshold_state": "neutral"
+    },
+    "relative_unrealized_profit": {
+      "label": "Relative Unrealized Profit",
+      "current_value": 0.2,
+      "metric_date": "2026-07-28",
+      "judgment_status": "current",
+      "eligible_for_judgment": true,
+      "threshold_state": "neutral"
+    },
+    "relative_unrealized_loss_zscore_4y": {
+      "label": "RUL · 4年 z-score",
+      "current_value": 0.0,
+      "metric_date": "2026-07-28",
+      "judgment_status": "current",
+      "eligible_for_judgment": true,
+      "threshold_state": "neutral"
+    },
+    "realized_cap_relative_npc_30d": {
+      "label": "Realized Cap Relative NPC · 30d",
+      "current_value": 0.0,
+      "metric_date": "2026-07-28",
+      "judgment_status": "current",
+      "eligible_for_judgment": true,
+      "threshold_state": "neutral"
+    },
+    "asopr": {
+      "label": "aSOPR",
+      "current_value": 1.0,
+      "metric_date": "2026-07-28",
+      "judgment_status": "current",
+      "eligible_for_judgment": true,
+      "threshold_state": "neutral"
+    },
+    "hodler_npc_30d": {
+      "label": "HODLer NPC · 30d",
+      "current_value": 0.0,
+      "metric_date": "2023-01-12",
+      "judgment_status": "display_only",
+      "eligible_for_judgment": false,
+      "threshold_state": "unknown"
+    },
+    "spent_value_ge155d_share": {
+      "label": "≥155d 花费价值占比",
+      "current_value": 0.0,
+      "metric_date": "2023-01-12",
+      "judgment_status": "display_only",
+      "eligible_for_judgment": false,
+      "threshold_state": "unknown"
+    },
+    "seller_exhaustion": {
+      "label": "Seller Exhaustion Constant",
+      "current_value": 1.0,
+      "metric_date": "2026-07-28",
+      "judgment_status": "current",
+      "eligible_for_judgment": true,
+      "threshold_state": "neutral"
+    },
+    "puell_multiple": {
+      "label": "Puell Multiple",
+      "current_value": 1.1,
+      "metric_date": "2026-07-28",
+      "judgment_status": "current",
+      "eligible_for_judgment": true,
+      "threshold_state": "none"
+    },
+    "thermocap_multiple_zscore": {
+      "label": "Thermocap Multiple · 周期 z",
+      "current_value": 0.0,
+      "metric_date": "2026-07-28",
+      "judgment_status": "current",
+      "eligible_for_judgment": true,
+      "threshold_state": "neutral"
+    },
+    "cvdd_proximity": {
+      "label": "CVDD 接近程度",
+      "current_value": 1.0,
+      "metric_date": "2026-07-28",
+      "judgment_status": "validation_pending",
+      "eligible_for_judgment": false,
+      "threshold_state": "unknown"
+    },
+    "reserve_risk_zscore": {
+      "label": "Reserve Risk · 周期",
+      "current_value": 0.0,
+      "metric_date": "2026-07-28",
+      "judgment_status": "current",
+      "eligible_for_judgment": true,
+      "threshold_state": "neutral"
+    }
+  },
+  "scenarios": [
+    {
+      "id": "both_core_none",
+      "description": "MVRV 与 Puell 都没有进入观察区。",
+      "expected_allowed_stages": ["尚未进入熊底观察期"],
+      "ai_call": true,
+      "strong_auxiliary_themes": [],
+      "contrary_or_incomplete": ["估值与矿工压力均未触发"]
+    },
+    {
+      "id": "valuation_watch_only",
+      "description": "只有估值锚进入观察区，矿工压力尚未触发。",
+      "metric_overrides": {
+        "mvrv": {"current_value": 0.9, "threshold_state": "watch"}
+      },
+      "expected_allowed_stages": ["熊市下行期"],
+      "ai_call": true,
+      "strong_auxiliary_themes": [],
+      "contrary_or_incomplete": ["Puell 尚未进入压力区"]
+    },
+    {
+      "id": "miner_watch_only",
+      "description": "只有矿工收入锚进入观察区，估值尚未触发。",
+      "metric_overrides": {
+        "puell_multiple": {"current_value": 0.7, "threshold_state": "watch"}
+      },
+      "expected_allowed_stages": ["熊市下行期"],
+      "ai_call": true,
+      "strong_auxiliary_themes": [],
+      "contrary_or_incomplete": ["MVRV 尚未进入压力区"]
+    },
+    {
+      "id": "both_core_watch",
+      "description": "估值与矿工压力同时进入观察区，但都还没有深度触发。",
+      "metric_overrides": {
+        "mvrv": {"current_value": 0.9, "threshold_state": "watch"},
+        "puell_multiple": {"current_value": 0.7, "threshold_state": "watch"}
+      },
+      "expected_allowed_stages": ["熊市下行期", "深度压力期"],
+      "ai_call": true,
+      "strong_auxiliary_themes": [],
+      "contrary_or_incomplete": ["两个核心维度尚未进入深度压力"]
+    },
+    {
+      "id": "valuation_deep_miner_watch",
+      "description": "估值进入深度压力，矿工收入仍处于观察区。",
+      "metric_overrides": {
+        "mvrv": {"current_value": 0.7, "threshold_state": "deep"},
+        "puell_multiple": {"current_value": 0.7, "threshold_state": "watch"}
+      },
+      "expected_allowed_stages": ["深度压力期", "筑底证据积累期"],
+      "ai_call": true,
+      "strong_auxiliary_themes": [],
+      "contrary_or_incomplete": ["Puell 尚未进入深度压力"]
+    },
+    {
+      "id": "both_deep_aviv_unconfirmed",
+      "description": "两个核心锚都在深度压力区，但 AVIV 尚未深度复核。",
+      "metric_overrides": {
+        "mvrv": {"current_value": 0.7, "threshold_state": "deep"},
+        "puell_multiple": {"current_value": 0.4, "threshold_state": "deep"},
+        "aviv": {"current_value": 0.6, "threshold_state": "watch"}
+      },
+      "expected_allowed_stages": ["深度压力期", "筑底证据积累期"],
+      "ai_call": true,
+      "strong_auxiliary_themes": [],
+      "contrary_or_incomplete": ["AVIV 尚未形成深度复核"]
+    },
+    {
+      "id": "both_deep_aviv_deep",
+      "description": "两个核心锚深度承压，并得到 AVIV 的深度复核。",
+      "metric_overrides": {
+        "mvrv": {"current_value": 0.7, "threshold_state": "deep"},
+        "puell_multiple": {"current_value": 0.4, "threshold_state": "deep"},
+        "aviv": {"current_value": 0.5, "threshold_state": "deep"}
+      },
+      "expected_allowed_stages": ["筑底证据积累期", "熊底证据充分期"],
+      "ai_call": true,
+      "strong_auxiliary_themes": [],
+      "contrary_or_incomplete": ["辅助证据仍需观察是否一致"]
+    },
+    {
+      "id": "strong_auxiliary_pressure",
+      "description": "核心仍在观察范围，但亏损、投降和卖方耗竭辅助主题同时增强。",
+      "metric_overrides": {
+        "mvrv": {"current_value": 0.9, "threshold_state": "watch"},
+        "puell_multiple": {"current_value": 0.7, "threshold_state": "watch"},
+        "relative_unrealized_loss_zscore_4y": {"current_value": 3.2, "threshold_state": "strong"},
+        "asopr": {"current_value": 0.95, "threshold_state": "strong"},
+        "seller_exhaustion": {"current_value": 0.05, "threshold_state": "strong"}
+      },
+      "expected_allowed_stages": ["熊市下行期", "深度压力期"],
+      "ai_call": true,
+      "strong_auxiliary_themes": ["supply_loss", "realized_loss", "seller_exhaustion"],
+      "contrary_or_incomplete": ["核心锚仍未进入深度压力"]
+    },
+    {
+      "id": "stale_core_anchor",
+      "description": "关键 MVRV 数据过期，不能创建当前阶段的 AI 请求。",
+      "metric_overrides": {
+        "mvrv": {
+          "current_value": 0.9,
+          "metric_date": "2026-07-20",
+          "judgment_status": "display_only",
+          "eligible_for_judgment": false,
+          "threshold_state": "unknown",
+          "availability_reason": "超过两天新鲜度上限"
+        }
+      },
+      "expected_allowed_stages": ["数据不足"],
+      "ai_call": false,
+      "strong_auxiliary_themes": [],
+      "contrary_or_incomplete": ["MVRV 关键锚过期"]
+    },
+    {
+      "id": "stale_auxiliary",
+      "description": "辅助指标过期，但两个关键锚仍可用于阶段判断。",
+      "metric_overrides": {
+        "puell_multiple": {"current_value": 0.7, "threshold_state": "watch"},
+        "psip": {
+          "current_value": 0.45,
+          "metric_date": "2026-07-20",
+          "judgment_status": "display_only",
+          "eligible_for_judgment": false,
+          "threshold_state": "unknown",
+          "availability_reason": "辅助数据已过期，不进入当前证据简报"
+        }
+      },
+      "expected_allowed_stages": ["熊市下行期"],
+      "ai_call": true,
+      "strong_auxiliary_themes": [],
+      "contrary_or_incomplete": ["PSIP 过期，不作为反面证据"]
+    }
+  ]
+}
