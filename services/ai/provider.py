@@ -41,6 +41,7 @@ DEFAULT_MODEL = "glm-5.2"
 _SYSTEM_PROMPT = (
     "你是 BTC 周期证据看板的日度分析器。机器已经把指标整理成核心维度和辅助证据主题。"
     "你的任务是综合这些证据关系，在机器给出的相邻阶段范围内选择一个阶段并解释为什么。"
+    "所有解释都会直接展示给普通用户：只说明市场正在发生什么，不解释后台规则怎样限制判断。"
     "先说证据合在一起说明什么，再提少量代表性指标；不要逐项复述指标定义或卡片数字。"
     "你只能基于已提供的证据简报做归纳，绝不预测价格、不给出任何买卖/入场/仓位/杠杆建议、不输出任何概率或置信度数字。"
     "输出必须是单个 JSON 对象，字段使用简体中文，遵循下面给定的固定词汇表与结构。"
@@ -52,7 +53,9 @@ def _user_prompt(
     data_date: str,
     validation_feedback: str | None = None,
 ) -> str:
-    forbidden_terms = "、".join(validator.FORBIDDEN_OUTPUT_TERMS)
+    forbidden_terms = "、".join(
+        validator.FORBIDDEN_OUTPUT_TERMS + validator.INTERNAL_OUTPUT_TERMS
+    )
     correction = ""
     if validation_feedback:
         correction = (
@@ -72,12 +75,14 @@ def _user_prompt(
         "MVRV 与 AVIV 属于同一个估值维度，不能写成两张估值票；Puell 是独立的矿工压力维度。\n"
         "辅助主题不能扩大 allowed_stages；它们只能帮助你解释当前阶段内部的压力、投降、恢复或矛盾。\n"
         "当 strong_auxiliary_themes 非空时，pressure_summary 必须明确说明当前阶段内部的压力程度。\n\n"
+        "把后台判断翻译成市场语言：估值未触发可写成“整体估值还没有进入更深的压力区”；"
+        "矿工进入观察可写成“矿工收入已经开始承压”；"
+        "多个压力现象同时出现可写成“亏损卖出、卖方力量减弱等现象说明当前压力不轻”。\n"
+        "不要告诉用户某类证据能不能改变阶段，只说明这些现象显示压力加深，但还不足以判断进入更深阶段。\n"
         "即使是否定句或风险提示，也不要复述任何禁止词；只描述证据、阶段和待确认条件。\n"
         "描述阈值档位时不得把单阈值指标说成还缺少更深档位。\n"
         f"禁止词表（输入里出现也不能照抄）：{forbidden_terms}。\n"
         "提及相关指标时，改用“链上花费”“供应变化”“阶段确认”等中性说法。\n"
-        "Reserve Risk 的数值进入周期低位，含义是长期持有信念进入周期高位，绝不能写成持有信念低位。\n"
-        "HODLer 的零阈值不要改名为“积累/链上花费分界”，请称为“长期供应净变化零线”。\n"
         f"{correction}\n"
         "输出 JSON 结构（不要输出任何 JSON 以外的文字）：\n"
         "{\n"
@@ -87,18 +92,18 @@ def _user_prompt(
         '  "summary": "<先综合至少两个证据维度，再用少量代表性证据说明，不预测价格>",\n'
         '  "pressure_summary": "<若有强辅助主题，说明当前阶段内部压力；否则为空字符串>",\n'
         '  "compact": {\n'
-        '    "support": {"title": "<短标题>", "text": "<支持证据要点>"},\n'
-        '    "obstacle": {"title": "<短标题>", "text": "<未完成或反面证据>"},\n'
-        '    "next": {"title": "<短标题>", "text": "<进入下一阶段需要的确认>"}\n'
+        '    "support": {"title": "<短标题>", "text": "<用自然语言说明最主要的市场现象>"},\n'
+        '    "obstacle": {"title": "<短标题>", "text": "<说明为什么还没有进入更深阶段>"},\n'
+        '    "next": {"title": "<短标题>", "text": "<说明接下来值得观察什么>"}\n'
         "  },\n"
         '  "categories": [\n'
         '    {"id": "<类别id>", "status": "<状态>", "note": "<一句话说明，可为空>"}\n'
         "    // 共 6 个，覆盖全部类别\n"
         "  ],\n"
         '  "detailed": {\n'
-        '    "supporting": "<核心依据与辅助主题如何共同支持当前阶段>",\n'
-        '    "contrary": "<反面或未完成证据的详细说明>",\n'
-        '    "next_stage": "<下一阶段确认条件的详细说明>",\n'
+        '    "supporting": "<主要市场现象如何共同说明当前阶段>",\n'
+        '    "contrary": "<目前仍未出现或仍不充分的市场现象>",\n'
+        '    "next_stage": "<接下来值得观察的变化>",\n'
         '    "pressure": "<阶段内部压力的展开说明，可为空>"\n'
         "  }\n"
         "}\n\n"
@@ -153,50 +158,182 @@ def _chat(
     return parsed
 
 
+_PUBLIC_THEME_PHRASES = {
+    "supply_loss": "供应利润空间正在收窄",
+    "realized_loss": "链上亏损卖出增多",
+    "seller_exhaustion": "卖方力量出现减弱迹象",
+    "recovery_absorption": "市场承接正在发生变化",
+    "holder_behavior": "长期持有者行为正在发生变化",
+    "miner_pressure": "矿工收入压力进一步加深",
+    "long_term_anchor": "价格正在接近长期成本压力区",
+}
+
+_VALUATION_PHRASES = {
+    "none": "整体估值还没有进入明显压力区",
+    "watch": "整体估值已经开始承压",
+    "deep": "整体估值已经进入较深压力区",
+    "missing": "整体估值数据暂时不可用",
+}
+
+_MINER_PHRASES = {
+    "none": "矿工收入暂未出现明显压力",
+    "watch": "矿工收入已经开始承压",
+    "deep": "矿工收入压力已经明显加深",
+    "missing": "矿工收入数据暂时不可用",
+}
+
+_NEXT_OBSERVATION_BY_STAGE = {
+    "尚未进入熊底观察期": "观察整体估值或矿工收入是否开始承压。",
+    "熊市下行期": "观察整体估值是否继续下降，以及矿工收入压力是否进一步加深。",
+    "深度压力期": "观察整体估值和矿工收入压力是否同时加深。",
+    "筑底证据积累期": "观察整体估值、矿工收入和活跃投资者成本是否都进入深度压力。",
+    "熊底证据充分期": "继续观察多类市场压力是否保持一致。",
+}
+
+
 def _mock_analysis(data_date: str, evidence_brief: dict | None = None) -> dict:
-    """A fixed, validator-compliant analysis for offline / --mock-ai runs."""
+    """Return deterministic ordinary-language copy for offline acceptance."""
+
     brief = evidence_brief or {}
     allowed = brief.get("allowed_stages") or ["熊市下行期"]
     strong = brief.get("strong_auxiliary_themes") or []
-    # 机器层已经给出允许的阶段范围。没有强辅助证据时，离线示例取较保守的一端；
-    # 只有在辅助证据确实形成一致压力时，才展示范围内更高的一档。
     stage = allowed[-1] if strong and len(allowed) > 1 else allowed[0]
-    strong_labels = [str(item.get("label")) for item in strong if item.get("label")]
-    pressure = (
-        f"{'、'.join(strong_labels)}等辅助证据同时偏强，"
-        "说明当前阶段内部的压力较重，但它们不会越过核心阶段上限。"
-        if strong
-        else "当前辅助证据没有形成额外的强压力主题。"
-    )
+
     dimensions = brief.get("core_dimensions", {})
-    valuation_state = dimensions.get("valuation", {}).get("state")
-    miners_state = dimensions.get("miners", {}).get("state")
-    status_for_state = {"none": "未确认", "watch": "部分确认", "deep": "充分确认"}
+    valuation_state = dimensions.get("valuation", {}).get("state", "none")
+    miners_state = dimensions.get("miners", {}).get("state", "none")
+    valuation_text = _VALUATION_PHRASES.get(
+        valuation_state, _VALUATION_PHRASES["missing"]
+    )
+    miners_text = _MINER_PHRASES.get(miners_state, _MINER_PHRASES["missing"])
+
+    pressure_phrases = [
+        _PUBLIC_THEME_PHRASES.get(
+            str(item.get("theme_id")),
+            str(item.get("label") or "市场压力正在增加"),
+        )
+        for item in strong
+    ]
+    pressure = (
+        f"{'，'.join(pressure_phrases)}，说明当前市场压力偏重。"
+        if pressure_phrases
+        else ""
+    )
+    pressure_detail = (
+        f"{'，'.join(pressure_phrases)}，这些现象共同说明下行压力正在累积。"
+        if pressure_phrases
+        else "目前不同市场现象还没有形成更强的一致压力。"
+    )
+
+    obstacle = "部分市场现象仍需继续观察。"
+    if valuation_state == "none":
+        obstacle = "整体估值还没有进入更深的压力区。"
+    elif miners_state == "none":
+        obstacle = "矿工收入暂未出现明显压力。"
+
+    summary_parts = [
+        f"当前处于{stage}。",
+        f"{valuation_text}，{miners_text}。",
+        pressure_detail,
+    ]
+    if stage != "熊底证据充分期":
+        summary_parts.append(
+            f"不过，{obstacle.rstrip('。')}，因此现阶段还不能判断市场已经进入更深阶段。"
+        )
+    summary = "".join(summary_parts)
+    next_observation = _NEXT_OBSERVATION_BY_STAGE.get(
+        stage, "继续观察整体估值和矿工收入压力的变化。"
+    )
+
+    status_for_state = {
+        "none": "未确认",
+        "watch": "部分确认",
+        "deep": "充分确认",
+    }
     valuation_status = status_for_state.get(valuation_state, "未确认")
     miners_status = status_for_state.get(miners_state, "未确认")
+    theme_ids = {
+        str(item.get("theme_id"))
+        for item in brief.get("strong_auxiliary_themes", [])
+        + brief.get("auxiliary_themes", [])
+    }
+
     return {
         "analysis_date": data_date,
         "stage": stage,
         "consistency": "中等" if len(allowed) > 1 else "弱",
-        "summary": "估值与矿工压力共同决定当前阶段范围，辅助证据用于补充压力和未完成条件。",
+        "summary": summary,
         "pressure_summary": pressure,
         "compact": {
-            "support": {"title": "估值 + 矿工压力", "text": "估值和矿工收入两个独立维度共同限定了当前阶段范围。"},
-            "obstacle": {"title": "持有者行为仍在积累", "text": "持有者类别证据仍需更多独立确认。"},
-            "next": {"title": "下一阶段条件", "text": "等待简报列出的核心条件进一步满足。"},
+            "support": {
+                "title": "当前市场状态",
+                "text": f"{valuation_text}，{miners_text}。",
+            },
+            "obstacle": {
+                "title": "为什么还没有进入更深阶段",
+                "text": obstacle,
+            },
+            "next": {
+                "title": "接下来观察",
+                "text": next_observation,
+            },
         },
         "categories": [
-            {"id": "valuation", "status": valuation_status, "note": "MVRV 形成估值维度状态。"},
-            {"id": "supply", "status": "部分确认", "note": "供应盈亏结构偏向压力。"},
-            {"id": "capital", "status": "部分确认", "note": "已实现资本仍偏弱。"},
-            {"id": "holders", "status": "充分确认", "note": "持有者投降证据增强。"},
-            {"id": "miners", "status": miners_status, "note": "Puell 形成矿工压力维度状态。"},
-            {"id": "anchors", "status": "部分确认", "note": "长期成本锚开始接近。"},
+            {
+                "id": "valuation",
+                "status": valuation_status,
+                "note": f"{valuation_text}。",
+            },
+            {
+                "id": "supply",
+                "status": "部分确认" if "supply_loss" in theme_ids else "未确认",
+                "note": (
+                    "供应利润空间已经出现收窄。"
+                    if "supply_loss" in theme_ids
+                    else "供应盈亏结构暂未出现明显压力。"
+                ),
+            },
+            {
+                "id": "capital",
+                "status": "部分确认" if "realized_loss" in theme_ids else "未确认",
+                "note": (
+                    "链上花费者正在更多地承受亏损。"
+                    if "realized_loss" in theme_ids
+                    else "链上资本变化仍需继续观察。"
+                ),
+            },
+            {
+                "id": "holders",
+                "status": (
+                    "部分确认"
+                    if {"seller_exhaustion", "holder_behavior"} & theme_ids
+                    else "未确认"
+                ),
+                "note": (
+                    "卖方力量已经出现减弱迹象。"
+                    if "seller_exhaustion" in theme_ids
+                    else "持有者行为暂未出现足够变化。"
+                ),
+            },
+            {
+                "id": "miners",
+                "status": miners_status,
+                "note": f"{miners_text}。",
+            },
+            {
+                "id": "anchors",
+                "status": "部分确认" if "long_term_anchor" in theme_ids else "未确认",
+                "note": (
+                    "长期成本位置开始进入观察范围。"
+                    if "long_term_anchor" in theme_ids
+                    else "长期成本位置仍需继续观察。"
+                ),
+            },
         ],
         "detailed": {
-            "supporting": "估值与矿工压力是两个独立核心维度；辅助主题只用于补充当前阶段内部的压力强度。",
-            "contrary": "持有者投降信号与长期成本锚类别仍未充分聚合。",
-            "next_stage": "需要核心类别与支持证据形成更完整的一致性组合。",
+            "supporting": f"{valuation_text}，{miners_text}。{pressure_detail}",
+            "contrary": obstacle,
+            "next_stage": next_observation,
             "pressure": pressure,
         },
     }
@@ -212,21 +349,21 @@ def data_insufficient_analysis(data_date: str, evidence_brief: dict) -> dict:
         "analysis_date": data_date,
         "stage": "数据不足",
         "consistency": "弱",
-        "summary": "当前关键数据不完整，页面只说明数据状态，不把缺失数据当作未触发证据。",
+        "summary": "当前缺少判断市场阶段所需的最新估值或矿工收入数据，因此暂时只能说明数据状态。",
         "pressure_summary": "",
         "compact": {
             "support": {"title": "数据状态", "text": reason},
             "obstacle": {"title": "暂不能判断", "text": "MVRV 与 Puell 必须同时有当前有效数据。"},
-            "next": {"title": "恢复判断条件", "text": "补齐关键锚的当前数据后，系统才会重新生成阶段解释。"},
+            "next": {"title": "恢复判断条件", "text": "数据更新后，再重新判断整体估值和矿工收入压力。"},
         },
         "categories": [
-            {"id": category, "status": "未确认", "note": "数据不足，不把缺失解释为未触发。"}
+            {"id": category, "status": "未确认", "note": "目前没有足够的最新数据。"}
             for category in CATEGORY_IDS
         ],
         "detailed": {
             "supporting": reason,
-            "contrary": "当前没有足够的关键锚数据，辅助指标也不会替代核心判断。",
-            "next_stage": "关键锚恢复当前有效后，重新检查估值和矿工压力两个独立维度。",
+            "contrary": "在最新估值和矿工收入数据更新前，其他市场现象不足以说明当前阶段。",
+            "next_stage": "数据更新后，重新检查整体估值和矿工收入压力。",
             "pressure": "",
         },
     }

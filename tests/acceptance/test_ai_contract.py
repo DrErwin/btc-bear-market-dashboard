@@ -28,6 +28,43 @@ def assert_rejected(payload: dict) -> None:
         validate_analysis(payload)
 
 
+def plain_language_analysis() -> dict:
+    return {
+        "analysis_date": "2026-07-28",
+        "stage": "熊市下行期",
+        "consistency": "中等",
+        "summary": (
+            "矿工收入已经开始承压，链上亏损卖出增多，"
+            "说明市场内部压力不轻。"
+        ),
+        "pressure_summary": "亏损卖出和卖方力量减弱同时出现，当前压力偏重。",
+        "compact": {
+            "support": {
+                "title": "当前市场状态",
+                "text": "矿工收入承压，供应利润空间也在收窄。",
+            },
+            "obstacle": {
+                "title": "还没有进入更深阶段",
+                "text": "整体估值还没有进入更深的压力区。",
+            },
+            "next": {
+                "title": "接下来观察",
+                "text": "观察整体估值是否继续下降，以及矿工压力是否进一步加深。",
+            },
+        },
+        "categories": [
+            {"id": category, "status": "部分确认", "note": "相关市场现象已经出现。"}
+            for category in CATEGORY_IDS
+        ],
+        "detailed": {
+            "supporting": "矿工收入、亏损卖出和供应利润共同显示市场正在承压。",
+            "contrary": "整体估值尚未进入过去深熊阶段常见的位置。",
+            "next_stage": "继续观察整体估值与矿工收入压力是否进一步加深。",
+            "pressure": "亏损卖出和卖方力量减弱同时出现，当前压力偏重。",
+        },
+    }
+
+
 def test_current_offline_analysis_matches_the_ai_contract() -> None:
     normalized = validate_analysis(load_analysis())
 
@@ -123,6 +160,39 @@ def test_forbidden_word_feedback_names_the_exact_term() -> None:
         validate_analysis(payload)
 
     assert any("买入" in error for error in exc_info.value.errors)
+
+
+@pytest.mark.parametrize(
+    "internal_term",
+    [
+        "核心锚",
+        "强辅助",
+        "阶段上限",
+        "抬高阶段",
+        "替代核心",
+        "allowed_stages",
+        "triggered",
+        "evidence_use",
+        "机器规定",
+        "系统不允许",
+    ],
+)
+def test_rejects_internal_rule_language_from_user_visible_text(
+    internal_term: str,
+) -> None:
+    payload = plain_language_analysis()
+    payload["summary"] = f"当前结论依据{internal_term}。"
+
+    with pytest.raises(InvalidAnalysisError) as exc_info:
+        validate_analysis(payload)
+
+    assert any(internal_term in error for error in exc_info.value.errors)
+
+
+def test_allows_observational_loss_selling_language() -> None:
+    normalized = validate_analysis(plain_language_analysis())
+
+    assert "链上亏损卖出增多" in normalized["summary"]
 
 
 def test_rejects_forbidden_advice_field_even_when_nested() -> None:

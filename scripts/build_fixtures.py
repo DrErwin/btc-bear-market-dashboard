@@ -32,24 +32,24 @@ DATA_DIR = ROOT / "dashboard" / "public" / "data"
 FALLBACK_ANALYSIS = {
     "stage": "深度压力期",
     "consistency": "中等",
-    "summary": "多个压力类别已经明显，但仍需要更多独立类别确认。",
+    "summary": "整体估值和矿工收入都已明显承压，市场处于深度压力期；不过，持有者行为与长期成本位置还没有形成足够一致的变化。",
     "compact": {
-        "support": {"title": "估值与矿工压力同步", "text": "核心估值与矿工压力类别同时进入压力区。"},
-        "obstacle": {"title": "底部证据尚未聚合", "text": "持有者投降与长期成本锚类别仍未充分确认。"},
-        "next": {"title": "等待更多类别同步", "text": "需要更多独立类别进入观察区。"},
+        "support": {"title": "当前市场状态", "text": "整体估值和矿工收入都已进入明显压力区。"},
+        "obstacle": {"title": "还没有进入更深阶段", "text": "持有者行为与长期成本位置仍需更多当前数据支持。"},
+        "next": {"title": "接下来观察", "text": "观察持有者行为与长期成本位置是否出现一致变化。"},
     },
     "categories": [
-        {"id": "valuation", "status": "充分确认", "note": "核心估值进入深度压力。"},
+        {"id": "valuation", "status": "充分确认", "note": "整体估值进入深度压力。"},
         {"id": "supply", "status": "部分确认", "note": "供应盈亏结构偏向压力。"},
         {"id": "capital", "status": "部分确认", "note": "已实现资本仍偏弱。"},
         {"id": "holders", "status": "未确认", "note": "持有者投降证据尚不充分。"},
         {"id": "miners", "status": "充分确认", "note": "矿工压力已进入深度区。"},
-        {"id": "anchors", "status": "未确认", "note": "长期成本锚尚未接近。"},
+        {"id": "anchors", "status": "未确认", "note": "长期成本位置尚未接近历史压力区。"},
     ],
     "detailed": {
-        "supporting": "估值与矿工压力类别同步进入压力区，构成核心压力证据。",
-        "contrary": "持有者投降与长期成本锚类别尚未聚合，底部结构不完整。",
-        "next_stage": "需要持有者行为与长期成本锚类别同步进入观察区。",
+        "supporting": "整体估值和矿工收入同步进入压力区，说明市场压力已经明显加深。",
+        "contrary": "持有者行为与长期成本位置尚未形成一致变化。",
+        "next_stage": "继续观察持有者行为与长期成本位置是否同步变化。",
     },
 }
 

@@ -78,7 +78,27 @@ def assert_no_restricted_language(page: Page) -> None:
     # is enforced in the AI-generated analysis only.
     shell = page.locator(".evaluation-shell")
     text = shell.inner_text() if shell.count() else ""
-    for term in ("概率", "买入", "卖出", "入场价", "仓位", "杠杆"):
+    for term in (
+        "概率",
+        "买入",
+        "建议卖出",
+        "应该卖出",
+        "可以卖出",
+        "入场价",
+        "仓位",
+        "杠杆",
+        "核心锚",
+        "核心复核",
+        "强辅助",
+        "阶段上限",
+        "抬高阶段",
+        "替代核心",
+        "allowed_stages",
+        "triggered",
+        "evidence_use",
+        "机器规定",
+        "系统不允许",
+    ):
         assert term not in text, f"AI 分析区不应出现受限表达：{term}"
 
 

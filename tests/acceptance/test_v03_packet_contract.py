@@ -43,4 +43,5 @@ def test_checked_in_packet_exposes_strong_auxiliary_pressure_when_present() -> N
     packet = load_packet()
     if packet["evidence_brief"]["strong_auxiliary_themes"]:
         assert packet["analysis"].get("pressure_summary")
-        assert "阶段内部" in packet["analysis"]["pressure_summary"]
+        assert "压力" in packet["analysis"]["pressure_summary"]
+        assert "阶段上限" not in packet["analysis"]["pressure_summary"]

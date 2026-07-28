@@ -103,8 +103,9 @@ def test_optional_ai_environment_values_can_be_blank(
     assert "做多" in user_prompt
     assert "持仓" in user_prompt
     assert "链上花费" in user_prompt
-    assert "长期持有信念进入周期高位" in user_prompt
-    assert "长期供应净变化零线" in user_prompt
+    assert "整体估值还没有进入更深的压力区" in user_prompt
+    assert "矿工收入已经开始承压" in user_prompt
+    assert "阶段上限" in user_prompt
 
 
 def test_rc_npc_threshold_meaning_matches_its_configured_direction() -> None:

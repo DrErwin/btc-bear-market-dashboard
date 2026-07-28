@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import copy
+import json
 
 import pytest
 
@@ -33,12 +34,48 @@ def test_v03_ai_input_is_an_evidence_brief_not_a_definition_dump() -> None:
     assert request["allowed_stages"]
     assert request["core_dimensions"]["valuation"]["vote"] == "valuation"
     assert request["strong_auxiliary_themes"]
-    eligible_ids = {state["id"] for state in request["metric_states"]}
-    assert "hodler" not in eligible_ids
-    assert "spent155" not in eligible_ids
+    assert len(request["metric_states"]) == 16
+    by_id = {state["id"]: state for state in request["metric_states"]}
+    assert set(by_id["asopr"]) == {
+        "id",
+        "name",
+        "importance",
+        "value",
+        "date",
+        "status",
+        "thresholds",
+        "threshold_summary",
+        "evidence_use",
+    }
+    assert by_id["asopr"]["importance"].startswith("强辅助")
+    assert by_id["asopr"]["value"] == 0.9
+    assert by_id["asopr"]["date"] == "2026-07-28"
+    assert by_id["asopr"]["status"] == "当前可用，可参与判断"
+    assert by_id["asopr"]["thresholds"] == [
+        {
+            "rule": "< 1.0",
+            "name": "观察线",
+            "meaning": "辅助压力",
+            "triggered": True,
+        }
+    ]
+    assert "观察线" in by_id["asopr"]["threshold_summary"]
+    assert by_id["asopr"]["evidence_use"]
+
+    assert by_id["hodler"]["status"] == "仅供展示，不参与判断"
+    assert all(
+        threshold["triggered"] is None
+        for threshold in by_id["hodler"]["thresholds"]
+    )
+    assert "不进行阈值判断" in by_id["hodler"]["threshold_summary"]
+
+    assert by_id["cvdd"]["status"] == "待验证，不参与判断"
+    assert all(
+        threshold["triggered"] is None
+        for threshold in by_id["cvdd"]["thresholds"]
+    )
     keys = {key.casefold() for key in _walk_keys(request)}
     assert {"series", "formula", "source", "method", "caveat", "price"}.isdisjoint(keys)
-    assert len(request["metric_states"]) < 16
 
 
 def test_validator_can_enforce_machine_stage_range_and_pressure_summary() -> None:
@@ -94,3 +131,7 @@ def test_mock_provider_selects_only_from_compiled_range() -> None:
     assert analysis is not None
     assert analysis["stage"] in brief["allowed_stages"]
     assert analysis["pressure_summary"]
+    visible_text = json.dumps(analysis, ensure_ascii=False)
+    assert "链上亏损卖出增多" in visible_text
+    for internal_term in validator.INTERNAL_OUTPUT_TERMS:
+        assert internal_term not in visible_text

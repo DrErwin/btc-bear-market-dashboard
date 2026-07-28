@@ -10,8 +10,9 @@
 - HODLer NPC、`>=155d` 花费价值占比在当前数据状态下标为仅供展示；CVDD 标为待验证。
 - MVRV/Puell 任一关键锚缺失或过期时，系统生成“数据不足”状态且不调用 AI。
 - 机器生成 `allowed_stages`；AI 输出必须在允许范围内。
-- 强辅助主题进入 `pressure_summary`，解释阶段内部压力，但不能抬高核心阶段上限。
-- AI 输入改为证据简报，不携带图表历史、来源元数据、公式或密钥。
+- 强压力主题进入 `pressure_summary`，用亏损卖出、卖方力量和利润空间等市场现象说明压力轻重。
+- AI 输入改为证据简报；16 项指标各自包含重要性、值、日期、状态、阈值结果、阈值总结和证据用途，但不携带图表历史、来源元数据、公式或密钥。
+- 用户可见文案禁止出现“核心锚、强辅助、阶段上限、抬高阶段、替代核心”等内部语言；“链上亏损卖出”等市场现象描述不再被误判为交易建议。
 - 页面显示角色、数据状态、过期原因和普通人可读的综合解释；详细区分核心依据、压力补充、相反证据、下一阶段条件和数据限制。
 - 三个离线数据包已迁移到 schema/config `0.3.0`，保持整包回退结构。
 
@@ -19,7 +20,7 @@
 
 | 入口 | 结果 |
 |---|---|
-| `python -m pytest -q` | `95 passed` |
+| `python -m pytest tests/acceptance -q` | `104 passed` |
 | `cd dashboard; npm run build` | TypeScript 检查与 Vite 构建通过；仅有既有 bundle 大小警告 |
 | `python tests/acceptance/run_acceptance.py` | `ACCEPTANCE PASS`；构建、离线契约、Playwright 桌面/移动检查全部通过 |
 | `python scripts/test_packet.py` | 真实数据抓取、v0.3 数据包组装、原子写入和日期契约通过 |
@@ -30,7 +31,7 @@
 
 ## 独立 AI 解释复核
 
-按用户要求，AI 解读质量由独立子代理审查 `ai-explanations.json`，重点检查综合解释、强辅助压力说明、阶段越权、指标复述和普通人可读性。复审已确认五项检查全部通过，报告判定 **PASS**：`artifacts/review-evidence/v0.3.0/ai-explanations-subagent-review.md`。
+按用户要求，AI 解读质量由独立子代理审查 `ai-explanations.json`，重点检查综合解释、强压力是否清楚可见、内部规则是否泄漏、指标复述和普通人可读性。当前公开文案与十个固定场景全部通过，报告判定 **PASS**：`artifacts/review-evidence/v0.3.0/ai-explanations-subagent-review.md`。本次按用户决定不进行指标事实方向核验。
 
 本机未配置 `AI_API_KEY`，因此未执行真实远程模型调用；`scripts/verify_ai_explanations.py --real` 已保留为有密钥环境的同一质量门入口，密钥不会写入产物。
 

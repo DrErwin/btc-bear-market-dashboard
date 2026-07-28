@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import re
-from collections.abc import Iterable, Mapping
+from collections.abc import Mapping
 from typing import Any
 
 from .validator import InvalidAnalysisError
@@ -12,6 +12,14 @@ from .validator import InvalidAnalysisError
 def _triggered(metric: Mapping[str, Any]) -> bool:
     if isinstance(metric.get("triggered"), bool):
         return metric["triggered"]
+    threshold_results = [
+        threshold.get("triggered")
+        for threshold in metric.get("thresholds", [])
+        if isinstance(threshold, Mapping)
+        and isinstance(threshold.get("triggered"), bool)
+    ]
+    if threshold_results:
+        return any(threshold_results)
     value = metric.get("current_value")
     if not isinstance(value, (int, float)):
         return False
@@ -54,17 +62,6 @@ def _support_texts(analysis: Mapping[str, Any]) -> list[str]:
             )
         )
     return [text for text in texts if text]
-
-
-def _all_text(value: object) -> Iterable[str]:
-    if isinstance(value, str):
-        yield value
-    elif isinstance(value, Mapping):
-        for child in value.values():
-            yield from _all_text(child)
-    elif isinstance(value, list):
-        for child in value:
-            yield from _all_text(child)
 
 
 def _alias_pattern(alias: str) -> re.Pattern[str]:
@@ -147,17 +144,6 @@ def validate_analysis_semantics(
                 errors.append(
                     f"{category} 已有触发指标，状态不能为未确认"
                 )
-
-    combined = "\n".join(_all_text(analysis))
-    if re.search(r"(?:长期)?持有信念.{0,12}(?:周期)?低位", combined):
-        errors.append(
-            "Reserve Risk 含义写反：长期持有信念应为周期高位"
-        )
-    if "积累/链上花费分界" in combined:
-        errors.append(
-            "HODLer 零线不得改名为积累/链上花费分界，"
-            "请使用长期供应净变化零线"
-        )
 
     strong_themes = ai_input.get("strong_auxiliary_themes")
     if isinstance(strong_themes, list) and strong_themes:

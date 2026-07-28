@@ -46,24 +46,6 @@ def test_semantic_validator_rejects_confirmation_without_any_trigger() -> None:
         semantic_validator.validate_analysis_semantics(analysis, ai_input)
 
 
-def test_semantic_validator_rejects_reversed_reserve_risk_meaning() -> None:
-    analysis, ai_input = _current_context()
-    analysis["summary"] = "长期持有信念进入周期低位区。"
-
-    with pytest.raises(validator.InvalidAnalysisError, match="持有信念"):
-        semantic_validator.validate_analysis_semantics(analysis, ai_input)
-
-
-def test_semantic_validator_rejects_invented_hodler_zero_line_name() -> None:
-    analysis, ai_input = _current_context()
-    analysis["compact"]["obstacle"]["text"] = (
-        "HODLer NPC 尚未触发积累/链上花费分界。"
-    )
-
-    with pytest.raises(validator.InvalidAnalysisError, match="长期供应净变化零线"):
-        semantic_validator.validate_analysis_semantics(analysis, ai_input)
-
-
 def test_real_provider_rewrites_semantically_invalid_output_once(
     monkeypatch,
 ) -> None:

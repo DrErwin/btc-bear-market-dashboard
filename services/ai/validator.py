@@ -74,7 +74,9 @@ _FORBIDDEN_KEY_PARTS = (
 )
 FORBIDDEN_OUTPUT_TERMS = (
     "买入",
-    "卖出",
+    "建议卖出",
+    "应该卖出",
+    "可以卖出",
     "买卖",
     "做多",
     "做空",
@@ -98,9 +100,31 @@ FORBIDDEN_OUTPUT_TERMS = (
     "position size",
     "entry price",
 )
+INTERNAL_OUTPUT_TERMS = (
+    "核心锚",
+    "核心复核",
+    "强辅助",
+    "辅助票",
+    "允许阶段",
+    "阶段上限",
+    "抬高阶段",
+    "替代核心",
+    "增加一票",
+    "独立投票",
+    "allowed_stages",
+    "triggered",
+    "evidence_use",
+    "机器规定",
+    "系统不允许",
+)
 _FORBIDDEN_TEXT_RE = re.compile(
-    r"买入|卖出|买卖|做多|做空|抄底|入场(?:价|价格)?|仓位|持仓|杠杆|概率|"
+    r"买入|买卖|做多|做空|抄底|入场(?:价|价格)?|仓位|持仓|杠杆|概率|"
+    r"(?:建议|应该|可以|适合|考虑|立即|现在)\s*卖出|卖出建议|"
     r"\b(?:buy|sell|long|short|leverage|probability|confidence_pct|position(?:\s+size)?|entry\s+price)\b",
+    re.IGNORECASE,
+)
+_INTERNAL_TEXT_RE = re.compile(
+    "|".join(re.escape(term) for term in INTERNAL_OUTPUT_TERMS),
     re.IGNORECASE,
 )
 _NUMERIC_PROBABILITY_RE = re.compile(
@@ -123,7 +147,11 @@ def _scan_forbidden(value: object, path: str, errors: list[str]) -> None:
     elif isinstance(value, str):
         matches = [
             match.group(0)
-            for pattern in (_FORBIDDEN_TEXT_RE, _NUMERIC_PROBABILITY_RE)
+            for pattern in (
+                _FORBIDDEN_TEXT_RE,
+                _NUMERIC_PROBABILITY_RE,
+                _INTERNAL_TEXT_RE,
+            )
             if (match := pattern.search(value))
         ]
         if matches:
