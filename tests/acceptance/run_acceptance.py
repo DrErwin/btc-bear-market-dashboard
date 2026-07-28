@@ -33,9 +33,9 @@ BASE_URL = f"http://127.0.0.1:{PORT}/"
 def load_success_analysis() -> dict:
     packet_path = DIST / "data" / "packet.json"
     packet = json.loads(packet_path.read_text(encoding="utf-8"))
-    analysis = packet.get("analysis")
+    analysis = packet.get("analysis") or packet.get("fallback")
     if not isinstance(analysis, dict):
-        raise RuntimeError("成功数据包缺少可展示的 AI 分析")
+        raise RuntimeError("数据包缺少可展示的 AI 分析或回退结论")
     return analysis
 
 

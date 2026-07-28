@@ -132,7 +132,7 @@ def _chat(
         },
         method="POST",
     )
-    with urlopen(request, timeout=180) as response:
+    with urlopen(request, timeout=300) as response:
         payload = json.loads(response.read())
     content = payload["choices"][0]["message"]["content"]
     parsed = json.loads(content)
@@ -202,6 +202,7 @@ def call_ai(
         return None, f"AI 调用失败: {type(exc).__name__}: {str(exc)[:120]}"
 
     validation_feedback: str | None = None
+    last_call_error: str | None = None
     for attempt in range(2):
         try:
             raw = _chat(
@@ -221,7 +222,12 @@ def call_ai(
             KeyError,
             ValueError,
         ) as exc:
-            return None, f"AI 调用失败: {type(exc).__name__}: {str(exc)[:120]}"
+            last_call_error = (
+                f"AI 调用失败: {type(exc).__name__}: {str(exc)[:120]}"
+            )
+            if attempt == 0:
+                continue
+            return None, last_call_error
 
         try:
             validator.validate_analysis(raw)
@@ -233,4 +239,4 @@ def call_ai(
 
         return raw, None
 
-    return None, "AI 输出契约校验失败: 重试后仍不可用"
+    return None, last_call_error or "AI 输出契约校验失败: 重试后仍不可用"

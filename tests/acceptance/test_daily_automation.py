@@ -85,7 +85,7 @@ def test_optional_ai_environment_values_can_be_blank(
     assert captured["url"] == (
         "https://open.bigmodel.cn/api/paas/v4/chat/completions"
     )
-    assert captured["timeout"] == 180
+    assert captured["timeout"] == 300
     assert captured["body"]["model"] == "glm-5.2"
     assert captured["body"]["thinking"] == {"type": "enabled"}
     assert captured["body"]["reasoning_effort"] == "max"
@@ -159,6 +159,57 @@ def test_invalid_ai_wording_is_rewritten_once_before_fallback(
     assert analysis == visible_analysis
     assert len(requests) == 2
     assert "上一份输出未通过校验" in requests[1]["messages"][1]["content"]
+
+
+def test_transient_ai_timeout_is_retried_once(
+    monkeypatch,
+) -> None:
+    packet = json.loads(PACKET_PATH.read_text(encoding="utf-8"))
+    visible_analysis = packet["analysis"] or packet["fallback"]
+    attempts = 0
+
+    class FakeResponse:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            return False
+
+        def read(self) -> bytes:
+            response = {
+                "choices": [
+                    {
+                        "message": {
+                            "content": json.dumps(
+                                visible_analysis, ensure_ascii=False
+                            )
+                        }
+                    }
+                ]
+            }
+            return json.dumps(response, ensure_ascii=False).encode("utf-8")
+
+    def fake_urlopen(request, timeout):
+        nonlocal attempts
+        attempts += 1
+        if attempts == 1:
+            raise TimeoutError("temporary timeout")
+        return FakeResponse()
+
+    monkeypatch.setenv("AI_API_KEY", "test-only-key")
+    monkeypatch.delenv("AI_BASE_URL", raising=False)
+    monkeypatch.delenv("AI_MODEL", raising=False)
+    monkeypatch.setattr(provider, "urlopen", fake_urlopen)
+
+    analysis, reason = provider.call_ai(
+        packet["snapshot"],
+        data_date=packet["data_date"],
+        mock=False,
+    )
+
+    assert reason is None
+    assert analysis == visible_analysis
+    assert attempts == 2
 
 
 def test_daily_audit_log_is_not_ignored_by_git() -> None:
