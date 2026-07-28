@@ -1,6 +1,6 @@
 name: daily-update
 
-# Requirement 4: a fixed daily UTC run + manual trigger. Fetches public base
+# Requirement 4: a fixed daily Shanghai-time run + manual trigger. Fetches public base
 # series, derives the 16 indicators, asks the constrained AI, validates, and
 # publishes ONE complete packet. On any AI failure the previous success is kept
 # as fallback (today_available=false); on a data-source failure the previous
@@ -8,9 +8,10 @@ name: daily-update
 
 on:
   schedule:
-    # 01:13 UTC daily — past the 00:00 data-source stabilization, off the :00
-    # fleet mark. Manual runs use workflow_dispatch below.
-    - cron: '13 1 * * *'
+    # 12:00 Asia/Shanghai daily. GitHub may start a scheduled job a few minutes
+    # late when its shared runner queue is busy.
+    - cron: '0 12 * * *'
+      timezone: "Asia/Shanghai"
   workflow_dispatch:
 
 permissions:
@@ -38,8 +39,8 @@ jobs:
           # Secrets stay in the env; run_daily only reads them and never writes
           # them into the packet, the run log, or stdout.
           AI_API_KEY: ${{ secrets.AI_API_KEY }}
-          AI_BASE_URL: ${{ secrets.AI_BASE_URL }}
-          AI_MODEL: ${{ secrets.AI_MODEL }}
+          AI_BASE_URL: https://open.bigmodel.cn/api/paas/v4
+          AI_MODEL: glm-5.2
         run: python services/run_daily.py
 
       - name: Build dashboard (verifies the new packet compiles before deploy)

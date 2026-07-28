@@ -12,7 +12,7 @@ analysis.
 Environment:
 * ``AI_API_KEY``  — bearer token; absent => skip AI (fallback).
 * ``AI_BASE_URL`` — OpenAI-compatible root (default GLM open platform).
-* ``AI_MODEL``    — model id (default glm-4.6).
+* ``AI_MODEL``    — model id (default glm-5.2).
 """
 
 from __future__ import annotations
@@ -34,7 +34,7 @@ from .input_builder import build_ai_input
 
 
 DEFAULT_BASE_URL = "https://open.bigmodel.cn/api/paas/v4"
-DEFAULT_MODEL = "glm-4.6"
+DEFAULT_MODEL = "glm-5.2"
 
 
 _SYSTEM_PROMPT = (
@@ -84,6 +84,8 @@ def _chat(ai_input: dict, data_date: str, api_key: str, base_url: str, model: st
             {"role": "user", "content": _user_prompt(ai_input, data_date)},
         ],
         "response_format": {"type": "json_object"},
+        "thinking": {"type": "enabled"},
+        "reasoning_effort": "max",
         "temperature": 0.2,
     }).encode("utf-8")
     request = Request(
@@ -96,7 +98,7 @@ def _chat(ai_input: dict, data_date: str, api_key: str, base_url: str, model: st
         },
         method="POST",
     )
-    with urlopen(request, timeout=90) as response:
+    with urlopen(request, timeout=180) as response:
         payload = json.loads(response.read())
     content = payload["choices"][0]["message"]["content"]
     parsed = json.loads(content)
@@ -157,8 +159,8 @@ def call_ai(
     if not api_key:
         return None, "未配置 AI_API_KEY，跳过 AI 分析（回退上一份成功结果）"
 
-    base_url = os.environ.get("AI_BASE_URL", DEFAULT_BASE_URL)
-    model = os.environ.get("AI_MODEL", DEFAULT_MODEL)
+    base_url = os.environ.get("AI_BASE_URL", "").strip() or DEFAULT_BASE_URL
+    model = os.environ.get("AI_MODEL", "").strip() or DEFAULT_MODEL
 
     try:
         ai_input = build_ai_input(snapshot)

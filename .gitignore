@@ -16,6 +16,7 @@
 !/scripts/**
 !/.github/
 !/.github/**
+!/artifacts/
 
 # Dashboard build output + deps (regenerated locally and on Cloudflare).
 /dashboard/node_modules/
@@ -36,5 +37,5 @@ __pycache__/
 /prototype-data-feasibility/
 
 # Artifacts: only the audit run-log is tracked; archives + screenshots are local.
-/artifacts/
+/artifacts/*
 !/artifacts/run-log.jsonl
