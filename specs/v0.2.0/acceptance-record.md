@@ -1,18 +1,18 @@
 # v0.2.0 — 验收记录
 
-> 所有验收于 2026-07-28 跑通；首次真实 AI 自动更新已由 GitHub Actions 完成，并经 Cloudflare 生产地址核验。
+> 所有验收于 2026-07-28 跑通；最终真实 AI 自动更新已由 GitHub Actions 完成，并经独立子代理与 Cloudflare 生产地址核验。
 
 ## 验收总览
 
 | 验收项 | 命令 | 结果 |
 |---|---|---|
-| v0.1.0 网页验收回归 | `python tests/acceptance/run_acceptance.py` | **ACCEPTANCE PASS**（success/fallback/no-fallback/responsive/keyboard/受限语言） |
+| 唯一完整验收入口 | `python tests/acceptance/run_acceptance.py` | **57 passed + ACCEPTANCE PASS**（success/fallback/no-fallback/responsive/keyboard/受限语言） |
 | 数据包契约 + 回退 | `python -m pytest tests/acceptance/test_packet_contract.py -q` | **21 passed** |
-| AI 契约 + 输入边界 | `pytest tests/acceptance/test_ai_contract.py tests/acceptance/test_input_boundary.py` | **15 passed** |
+| AI 契约 + 输入边界 + 证据语义 | 已纳入唯一完整验收入口 | **结构、禁词、触发状态、固定含义全部通过** |
 | 真实数据 parity | `python scripts/verify_pipeline.py` | **PARITY OK**（16 指标与原型逐位一致） |
 | 数据包组装 + 契约往返 | `python scripts/test_packet.py` | **PACKET BUILD + CONTRACT OK** |
 | 整包回退（fresh→fallback） | `python services/run_daily.py`（mock-ai，再跑无 key） | published-fresh → published-fallback，archive 生成 |
-| 前端构建 | `cd dashboard && npm run build` | vue-tsc 无错，583 模块，built ✓ |
+| 前端构建 | `cd dashboard && npm run build` | vue-tsc 无错，586 模块，built ✓ |
 
 ## 需求一验收
 
@@ -38,6 +38,7 @@
 
 - **管线**：`verify_pipeline` 用真实 Bitview + OBM 抓取，16 指标 latest_value 与原型 `build_data.py` 逐位匹配（rel=0）。
 - **AI 边界**：`test_ai_contract.py` 验证固定词汇表、拒绝禁止措辞与缺失字段；`test_input_boundary.py` 验证 AI 输入只含白名单字段、剥离 series/来源/历史。
+- **证据语义**：`test_ai_semantic_contract.py` 验证未触发指标不得进入支持证据、零触发类别只能标为未确认，并拦截 Reserve Risk、HODLer 零线等固定含义反转。
 - **回退**：`test_provider_no_key_returns_none` / `test_api_key_never_leaks_in_reason` 验证无 key 与失败原因不含密钥。
 - **自动纠错**：`test_invalid_ai_wording_can_be_rewritten_twice_before_fallback` 验证文案出现禁止词时会携带具体命中词完整重写，最多生成三次，仍失败才回退。
 - **阈值边界**：`test_input_builder_excludes_neutral_chart_reference_lines` 验证图表中性线不会进入 AI 的触发阈值清单。
@@ -46,7 +47,9 @@
 
 ## 后续 / 边界
 
-- 首次真实运行：GitHub Actions run `30349577265` 成功；生成 `run_id=20260728T100901Z`，`data_date=analysis_date=2026-07-28`，GLM-5.2 输出 `stage=熊市下行期`、`today_available=true`。
-- 自动提交 `efaf58f` 触发 Cloudflare Workers Builds 成功；公开 `/data/packet.json` 返回同一 `run_id`，证明数据、AI 结论与线上版本一致。
+- 首次真实运行：GitHub Actions run `30349577265` 成功；生成 `run_id=20260728T100901Z`，用于验证端到端链路。
+- 最终真实运行：GitHub Actions run `30354702215` 成功；生成 `run_id=20260728T112517Z`，`data_date=analysis_date=2026-07-28`，GLM-5.2 输出 `stage=熊市下行期`、`today_available=true`。
+- 独立子代理复核最终包为 PASS：支持证据仅含 6 个真实触发指标；RC-NPC 仅作阻碍说明；估值三项均未触发且 `valuation=未确认`；Reserve Risk、HODLer 零线与 CVDD 单档语义正确。
+- 自动提交 `ffe11e8` 触发 Cloudflare Workers Builds 成功；公开 `/data/packet.json` 返回同一 `run_id`，HTTP 200、`last_success_date=2026-07-28`，证明数据、AI 结论与线上版本一致。
 - `packet-failure.json` / `packet-no-fallback.json` 为固定验收 fixture，不随每日更新改变。
 - 历史 packet 归档在 `artifacts/packet-archive/`（最近 7 份，不进 git）。
