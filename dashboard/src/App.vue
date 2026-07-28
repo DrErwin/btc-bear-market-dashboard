@@ -17,6 +17,7 @@ const activeCategoryId = ref("valuation");
 const activeMetricId = ref("mvrv");
 const detailsOpen = ref(false);
 const methodOpen = ref(false);
+const railCollapsed = ref(false);
 
 onMounted(async () => {
   try {
@@ -69,7 +70,7 @@ function closeMethod(event: MouseEvent) {
     />
 
     <main>
-      <div v-if="loading" class="loading-state" role="status">正在读取固定快照…</div>
+      <div v-if="loading" class="loading-state" role="status">正在读取数据包…</div>
       <div v-else-if="error" class="fatal-state" role="alert">
         <strong>看板暂时无法读取</strong>
         <span>{{ error }}</span>
@@ -106,7 +107,7 @@ function closeMethod(event: MouseEvent) {
         <section class="evidence-board" aria-labelledby="board-title">
           <div class="section-heading">
             <div>
-              <span class="eyebrow">分类指标看板 / 16 个固定指标</span>
+              <span class="eyebrow">分类指标看板 / 16 个周期指标</span>
               <h2 id="board-title">从证据结构进入单项检查</h2>
             </div>
             <p>先看六类状态，再选择一个指标查看共享图表与阈值语义。</p>
@@ -119,14 +120,32 @@ function closeMethod(event: MouseEvent) {
             @select="selectCategory"
           />
 
-          <div class="workbench">
-            <aside class="metric-rail" aria-label="分类指标">
+          <div class="workbench" :class="{ 'is-rail-collapsed': railCollapsed }">
+            <nav v-if="railCollapsed" class="metric-tabs-compact" aria-label="指标切换">
+              <button
+                v-for="metric in visibleMetrics"
+                :key="metric.id"
+                type="button"
+                class="metric-tab"
+                :class="{ 'is-active': metric.id === activeMetricId }"
+                :aria-pressed="metric.id === activeMetricId"
+                @click="selectMetric(metric.id)"
+              >
+                {{ metric.label }}
+              </button>
+              <button type="button" class="rail-expand-btn" @click="railCollapsed = false">展开指标列</button>
+            </nav>
+
+            <aside v-show="!railCollapsed" class="metric-rail" aria-label="分类指标">
               <div class="rail-heading">
                 <div>
                   <span class="eyebrow">当前分类</span>
                   <h3>{{ activeCategory?.name }}</h3>
                 </div>
-                <span class="rail-count">{{ visibleMetrics.length }} 项</span>
+                <div class="rail-heading-actions">
+                  <span class="rail-count">{{ visibleMetrics.length }} 项</span>
+                  <button class="rail-collapse-btn" type="button" @click="railCollapsed = true">收起指标列</button>
+                </div>
               </div>
               <MetricList
                 :metrics="visibleMetrics"
@@ -137,7 +156,7 @@ function closeMethod(event: MouseEvent) {
             </aside>
 
             <div v-if="activeMetric && activeCategory" class="chart-column">
-              <SharedChart :metric="activeMetric" :series="data.series" />
+              <SharedChart :metric="activeMetric" :series="data.series" :bars="data.bars" :bottoms="data.bottoms" />
               <MetricExplanation :metric="activeMetric" :category="activeCategory" />
             </div>
           </div>
@@ -165,3 +184,11 @@ function closeMethod(event: MouseEvent) {
     </div>
   </div>
 </template>
+
+<style scoped>
+.rail-heading-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+</style>

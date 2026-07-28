@@ -16,6 +16,7 @@
   --orange: #e2a06e;
   --orange-deep: #b8683f;
   --blue: #7c9eb1;
+  --red: #c04a3a;
   --shadow: 0 22px 50px rgba(12, 21, 22, 0.15);
   font-family: "Iowan Old Style", "Baskerville", "Palatino Linotype", Georgia, serif;
   font-synthesis: none;
@@ -599,11 +600,78 @@ a:focus-visible {
   background: rgba(116, 130, 125, 0.09);
 }
 
+/* tier 三档配色（压力红系）—— 指标卡 .metric-tier 与图表 chart-facts 复用 */
+.tier-none {
+  color: var(--muted);
+  background: rgba(116, 130, 125, 0.1);
+}
+.tier-enter {
+  color: var(--orange-deep);
+  background: rgba(226, 160, 110, 0.14);
+}
+.tier-key {
+  color: var(--red);
+  background: rgba(192, 74, 58, 0.14);
+}
+
+/* chart-facts 在深色 chart-card 内，需更亮的字色且不要背景块（高 specificity 覆盖 .chart-facts strong） */
+.chart-facts strong.tier-none { color: var(--muted-dark); background: transparent; }
+.chart-facts strong.tier-enter { color: var(--orange); background: transparent; }
+.chart-facts strong.tier-key { color: var(--red); background: transparent; }
+.chart-facts strong.is-core { color: var(--mint); background: transparent; }
+.chart-facts strong.is-supporting { color: var(--muted-dark); background: transparent; }
+
 .workbench {
   display: grid;
   grid-template-columns: minmax(250px, 315px) minmax(0, 1fr);
   gap: 14px;
   margin-top: 14px;
+}
+
+.workbench.is-rail-collapsed {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.workbench.is-rail-collapsed .metric-rail {
+  display: none;
+}
+
+.rail-collapse-btn,
+.rail-expand-btn {
+  background: #16201f;
+  color: #c5d1cd;
+  border: 1px solid #2c3a39;
+  border-radius: 999px;
+  padding: 4px 12px;
+  font-size: 12px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.rail-collapse-btn:hover,
+.rail-expand-btn:hover {
+  border-color: #4a605c;
+}
+
+.metric-tabs-compact {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+  margin: 0 0 12px;
+}
+.metric-tab {
+  background: #16201f;
+  color: #c5d1cd;
+  border: 1px solid #2c3a39;
+  border-radius: 999px;
+  padding: 4px 12px;
+  font-size: 12px;
+  cursor: pointer;
+}
+.metric-tab.is-active {
+  background: #2c3a39;
+  border-color: #de8a57;
+  color: #f2f3ed;
 }
 
 .metric-rail,
@@ -686,10 +754,12 @@ a:focus-visible {
 
 .metric-role.is-core {
   color: var(--mint-deep);
+  background: rgba(155, 192, 184, 0.2);
 }
 
 .metric-role.is-supporting {
   color: var(--muted);
+  background: rgba(116, 130, 125, 0.1);
 }
 
 .metric-main {

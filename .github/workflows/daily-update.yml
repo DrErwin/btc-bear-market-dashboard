@@ -1,0 +1,61 @@
+name: daily-update
+
+# Requirement 4: a fixed daily UTC run + manual trigger. Fetches public base
+# series, derives the 16 indicators, asks the constrained AI, validates, and
+# publishes ONE complete packet. On any AI failure the previous success is kept
+# as fallback (today_available=false); on a data-source failure the previous
+# packet is left untouched. Pushing packet.json lets Cloudflare rebuild + deploy.
+
+on:
+  schedule:
+    # 01:13 UTC daily — past the 00:00 data-source stabilization, off the :00
+    # fleet mark. Manual runs use workflow_dispatch below.
+    - cron: '13 1 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: daily-update
+  cancel-in-progress: false
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Run daily pipeline
+        env:
+          # Secrets stay in the env; run_daily only reads them and never writes
+          # them into the packet, the run log, or stdout.
+          AI_API_KEY: ${{ secrets.AI_API_KEY }}
+          AI_BASE_URL: ${{ secrets.AI_BASE_URL }}
+          AI_MODEL: ${{ secrets.AI_MODEL }}
+        run: python services/run_daily.py
+
+      - name: Build dashboard (verifies the new packet compiles before deploy)
+        run: |
+          cd dashboard
+          npm ci
+          npm run build
+
+      - name: Commit updated packet + run log
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add dashboard/public/data/packet.json artifacts/run-log.jsonl
+          if git diff --cached --quiet; then
+            echo "No data change to commit."
+            exit 0
+          fi
+          git commit -m "chore(data): daily packet update $(date -u +%Y-%m-%d)"
+          git push

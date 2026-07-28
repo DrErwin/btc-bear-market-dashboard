@@ -1,17 +1,40 @@
-# This repository deliberately contains only the standalone web dashboard.
-# Keep local research, prototypes, services, test evidence, and tooling out of Git.
+# Tracked: the dashboard, the data pipeline + tests + specs + workflow.
+# Everything else (prototypes, build output, caches, archives) stays local.
 /*
-
-# Files required to run and build the dashboard.
 !.gitignore
 !README.md
+!requirements.txt
 !/dashboard/
 !/dashboard/**
+!/services/
+!/services/**
+!/tests/
+!/tests/**
+!/specs/
+!/specs/**
+!/scripts/
+!/scripts/**
+!/.github/
+!/.github/**
 
-# Generated or machine-local dashboard files.
+# Dashboard build output + deps (regenerated locally and on Cloudflare).
 /dashboard/node_modules/
 /dashboard/dist/
 /dashboard/.vite/
 /dashboard/npm-debug.log*
 /dashboard/yarn-debug.log*
 /dashboard/yarn-error.log*
+
+# Python caches.
+__pycache__/
+*.py[cod]
+
+# Local prototype / research workspace (build_data.py source-of-truth stays here,
+# the migrated production copy lives in services/data/).
+/prototype-indicator-timeline/
+/prototype-dashboard-wireframe/
+/prototype-data-feasibility/
+
+# Artifacts: only the audit run-log is tracked; archives + screenshots are local.
+/artifacts/
+!/artifacts/run-log.jsonl

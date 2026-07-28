@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { Metric } from "../types";
+import { tierClass } from "../utils/tier";
 
 const props = defineProps<{
   metrics: Metric[];
@@ -39,7 +40,7 @@ function moveFocus(event: KeyboardEvent, index: number) {
         <small>{{ metric.current_date }} · {{ metric.unit }}</small>
       </span>
       <span class="metric-value">{{ metric.display_value }}</span>
-      <span class="metric-tier">{{ metric.tier_label }}</span>
+      <span class="metric-tier" :class="tierClass(metric.tier_label)">{{ metric.tier_label }}</span>
     </button>
   </div>
 </template>
