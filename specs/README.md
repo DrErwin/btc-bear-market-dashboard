@@ -4,8 +4,8 @@
 
 | 版本 | 状态 | 文档 | 使用方式 |
 |---|---|---|---|
-| `v0.1.0` | 已上线（固定数据展示版） | [产品规格](v0.1.0/public-bear-bottom-evidence-dashboard.md) · [开发计划与验收](v0.1.0/phased-development-plan.md) · [指标验证记录](v0.1.0/indicator-validation-record.md) · [指标可实现性事实清单](v0.1.0/bear-market-indicator-expandability-research.md) · [上线记录](v0.1.0/deployment-record.md) | 当前公开版本，已部署但尚未接入每日真实数据与 AI 自动更新。 |
-| `v0.2.0` | 已实现（待配置 Secret 后首次自动更新上线） | [需求](v0.2.0/requirements.md) · [实现记录](v0.2.0/implementation-record.md) · [验收记录](v0.2.0/acceptance-record.md) | 完整数据包+整包回退、图表时间轴/缩放、HODLer 投降柱状图、每日自动更新管线与 GitHub Actions。 |
+| `v0.1.0` | 历史版本（固定数据展示版） | [产品规格](v0.1.0/public-bear-bottom-evidence-dashboard.md) · [开发计划与验收](v0.1.0/phased-development-plan.md) · [指标验证记录](v0.1.0/indicator-validation-record.md) · [指标可实现性事实清单](v0.1.0/bear-market-indicator-expandability-research.md) · [上线记录](v0.1.0/deployment-record.md) | 最初的固定数据公开版本，现已由每日真实数据版本替代。 |
+| `v0.2.0` | 已上线（每日自动更新） | [需求](v0.2.0/requirements.md) · [实现记录](v0.2.0/implementation-record.md) · [验收记录](v0.2.0/acceptance-record.md) | 完整数据包+整包回退、图表时间轴/缩放、HODLer 投降柱状图、每天北京时间 12:00 自动更新与 GLM-5.2 分析。 |
 | `v0.2.1` | 已实现 | [需求](v0.2.1/requirements.md) · [实现记录](v0.2.1/implementation-record.md) | 折叠左侧指标列、tier 三档红系配色、图表时间轴/缩放/十字、熊底虚线、价格对数坐标、柱状图按指标 id、核心/辅助标签配色。 |
 | `v0.2.2` | 已实现 | [需求](v0.2.2/requirements.md) · [实现记录](v0.2.2/implementation-record.md) | 删除多余 eyebrow、修复图表内拖动平移时间窗、曲线开关合并进四项图例、纵坐标自适应时阈值线始终可见。 |
 | `v0.2.3` | 已实现 | [需求](v0.2.3/requirements.md) · [实现记录](v0.2.3/implementation-record.md) | 图表高度可拖动并记忆、柱状图单绘图区底部叠加、删除图表说明、观察区改为文字颜色。 |

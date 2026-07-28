@@ -50,6 +50,11 @@ def _user_prompt(ai_input: dict, data_date: str) -> str:
         f"阶段只能从这些里选一个 stage：{list(ALLOWED_STAGES)}。\n"
         f"一致性只能从这些里选 consistency：{list(CONSISTENCY_VALUES)}。\n"
         f"必须为这六个类别各给出 status（只能从 {list(CATEGORY_STATUS_VALUES)} 中选）：{list(CATEGORY_IDS)}。\n\n"
+        "证据判定必须严格遵守 thresholds：direction=below 时 current_value 小于阈值才算触发；"
+        "direction=above 时 current_value 大于阈值才算触发。\n"
+        "只有触发阈值的指标才能列入支持证据；未触发的指标只能列入阻碍、反面证据或待确认条件，"
+        "不能因为数值看起来偏高、偏低、为正或为负就自行改变阈值方向。\n"
+        "核心或辅助是指标角色，不是类别角色；不要把类别称为核心类别或辅助类别，也不要把包含核心指标的类别概括为辅助类别。\n\n"
         "输出 JSON 结构（不要输出任何 JSON 以外的文字）：\n"
         "{\n"
         '  "analysis_date": "<上面给的分析日期>",\n'

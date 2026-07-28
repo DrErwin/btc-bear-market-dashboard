@@ -1,6 +1,6 @@
 # v0.2.0 — 验收记录
 
-> 所有验收于 2026-07-28 本地跑通。线上首次真实 AI 自动更新将在配置 `AI_API_KEY` Secret 后由 GitHub Actions 触发。
+> 所有验收于 2026-07-28 跑通；首次真实 AI 自动更新已由 GitHub Actions 完成，并经 Cloudflare 生产地址核验。
 
 ## 验收总览
 
@@ -39,11 +39,12 @@
 - **管线**：`verify_pipeline` 用真实 Bitview + OBM 抓取，16 指标 latest_value 与原型 `build_data.py` 逐位匹配（rel=0）。
 - **AI 边界**：`test_ai_contract.py` 验证固定词汇表、拒绝禁止措辞与缺失字段；`test_input_boundary.py` 验证 AI 输入只含白名单字段、剥离 series/来源/历史。
 - **回退**：`test_provider_no_key_returns_none` / `test_api_key_never_leaks_in_reason` 验证无 key 与失败原因不含密钥。
-- **workflow**：`.github/workflows/daily-update.yml` 每日 UTC 01:13 + 手动触发，密钥仅来自 Secrets，`npm run build` 验证后才 commit。
+- **workflow**：`.github/workflows/daily-update.yml` 每日北京时间 12:00 + 手动触发，密钥仅来自 Secret，`npm run build` 验证后才 commit。
 - **日期一致**：`run_daily` 新鲜度检查（`>max-stale-days` 则 skipped），`validate_packet` 强制 analysis_date == data_date。
 
 ## 后续 / 边界
 
-- 线上 `packet.json` 当前为 `--mock-ai` 生成（stage=筑底证据积累期）；配置 `AI_API_KEY` Secret 后首次 Actions 运行将替换为真实 AI。
+- 首次真实运行：GitHub Actions run `30349577265` 成功；生成 `run_id=20260728T100901Z`，`data_date=analysis_date=2026-07-28`，GLM-5.2 输出 `stage=熊市下行期`、`today_available=true`。
+- 自动提交 `efaf58f` 触发 Cloudflare Workers Builds 成功；公开 `/data/packet.json` 返回同一 `run_id`，证明数据、AI 结论与线上版本一致。
 - `packet-failure.json` / `packet-no-fallback.json` 为固定验收 fixture，不随每日更新改变。
 - 历史 packet 归档在 `artifacts/packet-archive/`（最近 7 份，不进 git）。

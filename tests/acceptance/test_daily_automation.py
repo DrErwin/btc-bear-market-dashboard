@@ -5,6 +5,7 @@ import subprocess
 from pathlib import Path
 
 from services.ai import provider
+from services.data.packet_display import BY_CANONICAL
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -86,6 +87,18 @@ def test_optional_ai_environment_values_can_be_blank(
     assert captured["body"]["model"] == "glm-5.2"
     assert captured["body"]["thinking"] == {"type": "enabled"}
     assert captured["body"]["reasoning_effort"] == "max"
+    user_prompt = captured["body"]["messages"][1]["content"]
+    assert "只有触发阈值的指标才能列入支持证据" in user_prompt
+    assert "未触发的指标只能列入阻碍、反面证据或待确认条件" in user_prompt
+    assert "核心或辅助是指标角色，不是类别角色" in user_prompt
+
+
+def test_rc_npc_threshold_meaning_matches_its_configured_direction() -> None:
+    rc_npc = BY_CANONICAL["realized_cap_relative_npc_30d"]
+
+    assert rc_npc.thresholds[0]["meaning"] == (
+        "三十日已实现资本变化由收缩转为扩张。"
+    )
 
 
 def test_daily_audit_log_is_not_ignored_by_git() -> None:

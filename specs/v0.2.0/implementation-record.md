@@ -60,11 +60,11 @@
 - `contract.py`：固定阶段/类别/状态/一致性词汇表 + JSON schema。
 - `input_builder.py`：从 snapshot 白名单取字段，剥离 series/来源/历史，只发可公开归纳的指标事实。
 - `validator.py`：拒绝禁止措辞（买卖/概率/杠杆等）、未知词汇、缺字段。
-- `provider.py`：OpenAI 兼容 chat 调用（默认 GLM 开放平台），所有失败返回 `(None, reason)` 触发回退。
+- `provider.py`：OpenAI 兼容 chat 调用（默认 GLM-5.2，开启深度思考并使用最高推理强度），所有失败返回 `(None, reason)` 触发回退。
 
 **主链路** `services/run_daily.py`：抓取 → 新鲜度检查 → 派生 → AI → 校验 → 组装 → 归档上一份 → 原子发布 → 追加 `artifacts/run-log.jsonl` 审计日志。
 
-**自动运行** `.github/workflows/daily-update.yml`：每日 UTC 01:13 + 手动触发；装 Python → 跑 `run_daily.py`（`AI_API_KEY`/`AI_BASE_URL`/`AI_MODEL` 只来自 GitHub Secrets）→ `npm run build` 验证 → commit `packet.json` + run-log → push 触发 Cloudflare 重建部署。无自建服务器、无自有域名，继续用 `*.workers.dev`。
+**自动运行** `.github/workflows/daily-update.yml`：每日北京时间 12:00（`Asia/Shanghai`）+ 手动触发；装 Python → 跑 `run_daily.py`（只有 `AI_API_KEY` 来自 GitHub Secret；平台地址和模型写在工作流配置中）→ `npm run build` 验证 → commit `packet.json` + run-log → push 触发 Cloudflare 重建部署。无自建服务器、无自有域名，继续用 `*.workers.dev`。
 
 **密钥边界**：API key 只在 GitHub Actions Secret / 运行环境；不进前端代码、不进 `packet.json`、不进 run-log、不进 stdout（`provider.call_ai` 失败原因截断且不含 key，`test_api_key_never_leaks_in_reason` 覆盖）。
 
@@ -75,7 +75,7 @@
 | HODLer 投降卖出尖峰的正式定义 | `hodler_npc_30d`（HODLer 30d 净持仓变化 / 供应，MVRV<1 gated）；原 BTC 口径=Glassnode LTH-Net Position Change | build_data 既有 core 实现；OBM ≥155d 花费为确认线 |
 | ≥155d 花费价值占比 | `spent_value_ge155d_share`（Open Bitcoin Metrics） | 公开可自动更新源 |
 | 默认时间范围 | 6 月 / 1 年 / 2 年 / 4 年 / 全量 | 周期指标需多年窗口；6 月看近期投降 |
-| 每日更新时刻 | UTC 01:13 | 晚于数据源 00:00 稳定出数，避开整点 fleet |
+| 每日更新时刻 | 北京时间 12:00（Asia/Shanghai） | 用户确认的固定更新时间；晚于数据源日线稳定出数 |
 | 可保留历史数据包数量 | 最近 7 份（`artifacts/packet-archive/`） | 回退 + 审计足够，不撑大仓库（archive 不进 git） |
 | 16 个指标可自动更新 | 全部基于 Bitview + OBM 公开日线 | `verify_pipeline.py` 16 指标 parity 通过 |
 

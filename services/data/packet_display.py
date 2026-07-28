@@ -157,7 +157,7 @@ INDICATORS: list[IndicatorDisplay] = [
         source="BRK / Bitview Realized Cap", method="三十日变化口径",
         caveat="负值不能直接解释为阶段已完成。",
         thresholds=[
-            {"label": "资本扩张/收缩分界", "meaning": "三十日已实现资本变化由扩转缩。"},
+            {"label": "资本扩张/收缩分界", "meaning": "三十日已实现资本变化由收缩转为扩张。"},
         ],
     ),
     IndicatorDisplay(

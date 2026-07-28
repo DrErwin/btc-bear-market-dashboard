@@ -2,20 +2,20 @@
 
 公开、只读的研究型看板：把 16 个 BTC 周期指标整理成六类证据，展示当前市场阶段、证据一致性、阈值位置、共享图表与持有者卖出柱状图。它不预测确切最低点，也不提供交易建议。
 
-> 当前线上版本：`v0.1.0`（固定数据展示版，已上线）；`v0.2.0` 已实现（真实每日数据、图表时间轴/缩放、HODLer 投降柱状图、每日自动更新），待配置 Secret 后首次自动更新上线。
+> 当前线上版本：`v0.2.4`（真实每日数据 + AI 自动分析，已上线）；系统每天北京时间 12:00 自动尝试更新。
 
 ## 在线访问
 
 公开地址：[btc-bear-market-dashboard.erwinwu000.workers.dev](https://btc-bear-market-dashboard.erwinwu000.workers.dev/)
 
-`v0.1.0` 部署在 Cloudflare Workers Static Assets。`v0.2.0` 上线后同一地址将切换为每日真实数据。
+网页部署在 Cloudflare Workers Static Assets。GitHub 每日任务生成完整数据包并推送后，Cloudflare 自动重建同一公开地址。
 
 ## v0.2.0 能力
 
 - **完整数据包 + 整包回退**：页面只读一份 `packet.json`；每日更新要么整包成功，要么继续展示上一份完整成功包，不混用不同日期的数据。
 - **图表时间轴与交互缩放**：6 月 / 1 年 / 2 年 / 4 年 / 全量预设、滚轮缩放、拖动平移、纵坐标随可视范围自动适配。
 - **HODLer 投降 + ≥155d 花费价值柱状图**：主图下方两个独立柱状系列，与主图共享同一时间窗口。
-- **每日自动更新**：GitHub Actions 每日 UTC 01:13 抓取公开链上数据 → 派生 16 指标 → 受约束 AI 分析 → 校验 → 原子发布；密钥只存 GitHub Secrets。
+- **每日自动更新**：GitHub Actions 每天北京时间 12:00 抓取公开链上数据 → 派生 16 指标 → GLM-5.2 深度分析 → 合规校验 → 原子发布；密钥只存 GitHub Secrets。
 
 详见 [实现记录](specs/v0.2.0/implementation-record.md) 与 [验收记录](specs/v0.2.0/acceptance-record.md)。
 

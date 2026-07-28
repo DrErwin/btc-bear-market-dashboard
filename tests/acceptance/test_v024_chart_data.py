@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import copy
 import json
+from datetime import date, timedelta
 from pathlib import Path
 
 import pytest
@@ -74,12 +75,43 @@ def test_packet_reproduces_exported_reference_lines_and_all_timeline_lines() -> 
         expected_lines = timeline_by_id[source_id]["lines"]
         assert [line["id"] for line in entry["lines"]] == [line["id"] for line in expected_lines]
         for actual, expected in zip(entry["lines"], expected_lines):
-            assert actual["label"] == expected["label"]
+            if display_id == "reserve" and actual["id"] == "primary":
+                # v0.2.1 deliberately shortened the public-facing name while
+                # preserving the z-score series and exported reference lines.
+                assert actual["label"] == "Reserve Risk · 周期"
+            else:
+                assert actual["label"] == expected["label"]
             assert actual["axis"] == expected["axis"]
-            assert actual["points"] == [
+            expected_points = [
                 {"date": day, "value": value * scale}
                 for day, value in expected["series"]
             ]
+            # The exported timeline is a frozen regression baseline ending on
+            # 2026-07-27. Daily production packets must preserve its historical
+            # shape while allowing the source to revise its most recent 90 days
+            # and allowing the pipeline to append newer dates.
+            actual_baseline = actual["points"][: len(expected_points)]
+            assert [point["date"] for point in actual_baseline] == [
+                point["date"] for point in expected_points
+            ]
+            stable_cutoff = (
+                date.fromisoformat(expected_points[-1]["date"])
+                - timedelta(days=90)
+            )
+            for actual_point, expected_point in zip(
+                actual_baseline, expected_points
+            ):
+                if date.fromisoformat(actual_point["date"]) <= stable_cutoff:
+                    assert actual_point["value"] == pytest.approx(
+                        expected_point["value"], rel=1e-9, abs=1e-9
+                    )
+
+            appended = actual["points"][len(expected_points) :]
+            if appended:
+                assert all(
+                    point["date"] > expected_points[-1]["date"]
+                    for point in appended
+                )
 
 
 def test_packet_rejects_malformed_line_axis_or_duplicate_id() -> None:
