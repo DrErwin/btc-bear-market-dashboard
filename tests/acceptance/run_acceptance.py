@@ -16,6 +16,7 @@ from pathlib import Path
 from urllib.request import urlopen
 
 import pytest
+from PIL import Image
 from playwright.sync_api import Page, expect, sync_playwright
 
 
@@ -66,6 +67,30 @@ def assert_no_restricted_language(page: Page) -> None:
         assert term not in text, f"AI 分析区不应出现受限表达：{term}"
 
 
+def assert_bar_visual_height(page: Page, kind: str, minimum: int = 90) -> None:
+    path = EVIDENCE / f"bar-visibility-{kind}.png"
+    page.locator(".shared-chart").screenshot(path=str(path))
+    image = Image.open(path).convert("RGB")
+    width, height = image.size
+    rows: list[int] = []
+    for y in range(int(height * 0.35), int(height * 0.82)):
+        count = 0
+        for x in range(width):
+            r, g, b = image.getpixel((x, y))
+            if kind == "hodler":
+                is_bar_pixel = r > g + 18 and g > b + 8 and r > 55
+            else:
+                is_bar_pixel = b > r + 12 and b > g + 8 and b > 55
+            if is_bar_pixel:
+                count += 1
+        if count >= 8:
+            rows.append(y)
+    assert rows and max(rows) - min(rows) + 1 >= minimum, (
+        f"{kind} 柱状图可见高度应至少为 {minimum}px，实际为 "
+        f"{(max(rows) - min(rows) + 1) if rows else 0}px"
+    )
+
+
 def success_flow(page: Page) -> None:
     page.set_viewport_size({"width": 1440, "height": 900})
     open_page(page)
@@ -110,8 +135,15 @@ def success_flow(page: Page) -> None:
             page.locator(".metric-card").filter(has_text=metric_label).first.click()
             expect(page.locator("#chart-title")).to_have_text(metric_label)
             expect(page.locator(".chart-legend")).to_contain_text("BTC 价格")
-            expect(page.locator(".chart-legend")).to_contain_text(metric_label)
-            expect(page.locator(".chart-legend")).to_contain_text("阈值线")
+            if metric_label in ("HODLer NPC · 30d", "≥155d 花费价值占比"):
+                legend_text = page.locator(".chart-legend").inner_text()
+                assert metric_label not in legend_text, "柱状指标不应显示重复的指标线开关"
+                assert "阈值线" not in legend_text, "柱状指标不应显示对应的阈值线开关"
+                assert page.locator(".chart-legend .legend-line.indicator").count() == 0
+                assert page.locator(".chart-legend .legend-line.threshold").count() == 0
+            else:
+                expect(page.locator(".chart-legend")).to_contain_text(metric_label)
+                expect(page.locator(".chart-legend")).to_contain_text("阈值线")
 
     assert_no_restricted_language(page)
     page.screenshot(path=str(EVIDENCE / "desktop-success.png"), full_page=True)
@@ -164,6 +196,86 @@ def responsive_and_keyboard_flow(page: Page) -> None:
     page.screenshot(path=str(EVIDENCE / "mobile-success.png"), full_page=True)
 
 
+def chart_interaction_flow(page: Page) -> None:
+    page.set_viewport_size({"width": 1440, "height": 900})
+    open_page(page)
+    page.evaluate("localStorage.removeItem('btc-dashboard.chart-height.v1')")
+    page.reload(wait_until="networkidle")
+    expect(page.locator(".evidence-board")).to_be_visible()
+
+    chart = page.locator(".shared-chart-wrap")
+    handle = page.locator(".chart-resize-handle")
+    chart_box = chart.bounding_box()
+    assert chart_box and abs(chart_box["height"] - 420) < 1, "图表默认高度应为 420px"
+    assert page.locator(".chart-subtitle").count() == 0, "图表标题下方说明应已删除"
+
+    page.get_by_text("持有者行为", exact=True).click()
+    page.locator(".metric-card").filter(has_text="HODLer NPC · 30d").first.click()
+    expect(page.locator("#chart-title")).to_have_text("HODLer NPC · 30d")
+    expect(page.locator(".chart-legend")).to_contain_text("HODLer 投降卖出尖峰")
+    legend_text = page.locator(".chart-legend").inner_text()
+    assert ">=155d 花费价值占比" not in legend_text, "HODLer 页面不应显示 ≥155d 柱状图"
+    assert "HODLer NPC · 30d" not in legend_text, "柱状指标不应再显示重复的指标线开关"
+    assert "阈值线" not in legend_text, "柱状指标不应显示对应的阈值线开关"
+    assert page.locator(".chart-legend .legend-line.indicator").count() == 0
+    assert page.locator(".chart-legend .legend-line.threshold").count() == 0
+    expect(page.locator(".shared-chart")).to_have_attribute("aria-label", "BTC 价格、HODLer 柱状图、历史熊底共享图表")
+    assert page.locator(".bars-empty-note").count() == 0, "全量范围应能看到柱状数据"
+    assert_bar_visual_height(page, "hodler")
+
+    page.locator(".metric-card").filter(has_text="≥155d 花费价值占比").first.click()
+    expect(page.locator("#chart-title")).to_have_text("≥155d 花费价值占比")
+    expect(page.locator(".chart-legend")).to_contain_text(">=155d 花费价值占比")
+    legend_text = page.locator(".chart-legend").inner_text()
+    assert "HODLer 投降卖出尖峰" not in legend_text, "≥155d 页面不应显示 HODLer 柱状图"
+    assert "≥155d 花费价值占比" not in legend_text, "柱状指标不应再显示重复的指标线开关"
+    expect(page.locator(".shared-chart")).to_have_attribute("aria-label", "BTC 价格、≥155d 柱状图、历史熊底共享图表")
+    assert_bar_visual_height(page, "spent155")
+
+    tier = page.locator(".metric-tier").first
+    background = tier.evaluate("element => getComputedStyle(element).backgroundColor")
+    assert background in ("transparent", "rgba(0, 0, 0, 0)"), "观察区状态不应使用文字背景色"
+
+    handle_box = handle.bounding_box()
+    assert handle_box
+    handle.scroll_into_view_if_needed()
+    handle_box = handle.bounding_box()
+    assert handle_box and 0 <= handle_box["y"] <= 900, "图表高度手柄应能滚动到视口内"
+    page.mouse.move(handle_box["x"] + handle_box["width"] / 2, handle_box["y"] + handle_box["height"] / 2)
+    page.mouse.down()
+    page.mouse.move(handle_box["x"] + handle_box["width"] / 2, handle_box["y"] + handle_box["height"] / 2 + 120)
+    page.mouse.up()
+    chart_box = chart.bounding_box()
+    assert chart_box and abs(chart_box["height"] - 540) < 2, "拖动手柄应增加图表高度"
+
+    page.reload(wait_until="networkidle")
+    expect(page.locator(".evidence-board")).to_be_visible()
+    chart_box = page.locator(".shared-chart-wrap").bounding_box()
+    assert chart_box and abs(chart_box["height"] - 540) < 2, "刷新后应保留图表高度"
+
+    handle = page.locator(".chart-resize-handle")
+    handle.focus()
+    handle.press("End")
+    assert page.locator(".chart-resize-handle").get_attribute("aria-valuenow") == "760"
+    handle.press("Home")
+    assert page.locator(".chart-resize-handle").get_attribute("aria-valuenow") == "320"
+    handle.press("ArrowDown")
+    assert page.locator(".chart-resize-handle").get_attribute("aria-valuenow") == "344"
+
+    page.get_by_text("持有者行为", exact=True).click()
+    page.locator(".metric-card").filter(has_text="HODLer NPC · 30d").first.click()
+    page.get_by_role("button", name="1 年", exact=True).click()
+    expect(page.locator(".bars-empty-note")).to_be_visible()
+    page.get_by_role("button", name="全量", exact=True).click()
+    expect(page.locator(".bars-empty-note")).to_have_count(0)
+    page.screenshot(path=str(EVIDENCE / "desktop-bars-overlay.png"), full_page=True)
+
+    page.evaluate("localStorage.setItem('btc-dashboard.chart-height.v1', '9999')")
+    page.reload(wait_until="networkidle")
+    expect(page.locator(".evidence-board")).to_be_visible()
+    assert page.locator(".chart-resize-handle").get_attribute("aria-valuenow") == "420", "非法高度应回到默认值"
+
+
 def ai_contract_flow() -> None:
     result = pytest.main(
         [
@@ -195,6 +307,7 @@ def main() -> int:
             browser = playwright.chromium.launch(**launch_options)
             page = browser.new_page()
             success_flow(page)
+            chart_interaction_flow(page)
             failure_flow(page)
             responsive_and_keyboard_flow(page)
             browser.close()

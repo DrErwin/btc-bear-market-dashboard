@@ -105,8 +105,7 @@ a:focus-visible {
 .axis-state,
 .data-stamp,
 .topbar-date,
-.chart-subtitle,
-.chart-legend,
+  .chart-legend,
 .metric-main small,
 .chart-facts span,
 .metric-explanation article > span,
@@ -603,15 +602,15 @@ a:focus-visible {
 /* tier 三档配色（压力红系）—— 指标卡 .metric-tier 与图表 chart-facts 复用 */
 .tier-none {
   color: var(--muted);
-  background: rgba(116, 130, 125, 0.1);
+  background: transparent;
 }
 .tier-enter {
   color: var(--orange-deep);
-  background: rgba(226, 160, 110, 0.14);
+  background: transparent;
 }
 .tier-key {
   color: var(--red);
-  background: rgba(192, 74, 58, 0.14);
+  background: transparent;
 }
 
 /* chart-facts 在深色 chart-card 内，需更亮的字色且不要背景块（高 specificity 覆盖 .chart-facts strong） */
@@ -838,12 +837,6 @@ a:focus-visible {
   letter-spacing: -0.055em;
 }
 
-.chart-subtitle {
-  margin: 5px 0 0;
-  color: var(--muted-dark);
-  font-size: 10px;
-}
-
 .chart-expand {
   padding: 7px 0;
   color: var(--mint);
@@ -864,10 +857,26 @@ a:focus-visible {
   font-size: 10px;
 }
 
-.chart-legend span {
+.chart-legend button {
   display: inline-flex;
   align-items: center;
   gap: 6px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  padding: 2px 6px;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  transition: border-color 0.15s, opacity 0.15s;
+}
+
+.chart-legend button:hover {
+  border-color: var(--line-dark);
+}
+
+.chart-legend button.is-off {
+  opacity: 0.35;
 }
 
 .legend-line {
@@ -889,8 +898,7 @@ a:focus-visible {
 
 .shared-chart {
   width: 100%;
-  height: 268px;
-  margin-top: 5px;
+  height: 100%;
 }
 
 .chart-facts {
@@ -1293,7 +1301,7 @@ a:focus-visible {
   }
 
   .shared-chart {
-    height: 230px;
+    height: 100%;
   }
 
   .explanation-grid {

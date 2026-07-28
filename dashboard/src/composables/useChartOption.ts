@@ -6,22 +6,41 @@ export interface ZoomRange {
   end: number; // 0..100 (percent)
 }
 
+export interface ChartVisibility {
+  price: boolean;
+  indicator: boolean;
+  thresholds: boolean;
+  bottoms: boolean;
+  hodler: boolean;
+  spent: boolean;
+}
+
 const BAR_METRIC_IDS = ["hodler", "spent155"];
+const BAR_SERIES_KEYS = {
+  hodler: "hodler_npc_30d",
+  spent155: "spent_value_ge155d_share",
+} as const;
+const BAR_HEIGHT_FRACTION = 0.4;
 
 /**
  * Shared-chart option.
  *
- * - Main line grid (BTC price + indicator + threshold markLines + bear-bottom
- *   vertical dashed markLines). Bars grid (HODLer capitulation + >=155d spent
- *   share) is added ONLY when the active metric IS one of those two bar
- *   metrics (v0.2.1: by id, not by category — so Seller Exhaustion no longer
- *   triggers bars).
+ * - One shared grid contains BTC price, the indicator, threshold/bottom
+ *   markLines, and (for a holder-capitulation metric) its one matching bar
+ *   series. Bars use a compressed right-side value axis so they sit in the
+ *   lower portion of the same plot instead of becoming a second panel.
  * - BTC price y-axis toggles linear/log via ``logPrice``.
  * - One dataZoom drives every x-axis; the inside zoom pans on drag (not on
  *   move) so a plain mouse move shows a crosshair instead of panning.
  * - axisPointer is a crosshair so hovering shows both the vertical (date) and
  *   horizontal (indicator value) readouts.
  * - Grid bottom + slider bottom leave room for the x-axis labels (v0.2.1).
+ * - v0.2.2: no native ECharts legend — the custom HTML legend in SharedChart is
+ *   the single legend AND the curve toggle. ``visibility`` drives each series'
+ *   opacity; threshold / bear-bottom markLine groups are included only while
+ *   their toggle is on, so they can be shown/hidden independently of the
+ *   indicator curve. The indicator y-axis always covers the threshold values so
+ *   threshold lines never fall outside the auto-fit range.
  */
 export function useChartOption(
   metric: Ref<Metric>,
@@ -30,6 +49,7 @@ export function useChartOption(
   zoom: Ref<ZoomRange>,
   bottoms: Ref<BottomMark[]>,
   logPrice: Ref<boolean>,
+  visibility: Ref<ChartVisibility>,
 ) {
   return computed(() => {
     const pricePoints = series.value.price;
@@ -43,22 +63,31 @@ export function useChartOption(
     const indicatorByDate = new Map(metricSeries.points.map((point) => [point.date, point.value]));
     const indicatorValues = dates.map((date) => indicatorByDate.get(date) ?? null);
 
-    // Bars render only for the two holder-capitulation metrics themselves.
+    // Each holder-capitulation metric owns one bar series: HODLer shows only
+    // HODLer NPC, while >=155d shows only spent-value share.
+    const showHodlerBar = metric.value.id === "hodler";
+    const showSpentBar = metric.value.id === "spent155";
     const isBarMetric = BAR_METRIC_IDS.includes(metric.value.id);
-    const hodlerBar = isBarMetric ? bars.value["hodler"] : undefined;
-    const spentBar = isBarMetric ? bars.value["spent155"] : undefined;
+    const hodlerBar = showHodlerBar ? bars.value[BAR_SERIES_KEYS.hodler] : undefined;
+    const spentBar = showSpentBar ? bars.value[BAR_SERIES_KEYS.spent155] : undefined;
     const hodlerByDate = new Map((hodlerBar?.points ?? []).map((p) => [p.date, p.value]));
     const spentByDate = new Map((spentBar?.points ?? []).map((p) => [p.date, p.value]));
-    const hodlerValues = isBarMetric ? dates.map((d) => (hodlerByDate.has(d) ? hodlerByDate.get(d)! : null)) : [];
-    const spentValues = isBarMetric ? dates.map((d) => (spentByDate.has(d) ? spentByDate.get(d)! : null)) : [];
+    const hodlerValues = showHodlerBar ? dates.map((d) => (hodlerByDate.has(d) ? hodlerByDate.get(d)! : null)) : [];
+    const spentValues = showSpentBar ? dates.map((d) => (spentByDate.has(d) ? spentByDate.get(d)! : null)) : [];
 
     // Visible slice for y-axis auto-fit.
     const startIdx = Math.max(0, Math.floor((zoom.value.start / 100) * n));
     const endIdx = Math.min(n, Math.ceil((zoom.value.end / 100) * n));
     const priceBounds = bounds(pricePoints.slice(startIdx, endIdx).map((p) => p.value));
-    const indBounds = bounds(indicatorValues.slice(startIdx, endIdx));
-    const hodlerBounds = isBarMetric ? bounds(hodlerValues.slice(startIdx, endIdx)) : { min: 0, max: 1 };
-    const spentBounds = isBarMetric ? bounds(spentValues.slice(startIdx, endIdx)) : { min: 0, max: 1 };
+    // Indicator y-axis must always cover the threshold values, otherwise the
+    // horizontal threshold markLines fall outside the auto-fit range and vanish
+    // on slices whose data is far from the threshold (v0.2.2 #4).
+    const indBounds = bounds([
+      ...indicatorValues.slice(startIdx, endIdx),
+      ...metricSeries.thresholds.map((threshold) => threshold.value),
+    ]);
+    const hodlerBounds = showHodlerBar ? compressedBarBounds(hodlerValues.slice(startIdx, endIdx)) : { min: 0, max: 1 };
+    const spentBounds = showSpentBar ? compressedBarBounds(spentValues.slice(startIdx, endIdx)) : { min: 0, max: 1 };
 
     // Horizontal threshold lines + vertical bear-bottom lines, merged on the indicator series.
     const thresholdLines = metricSeries.thresholds.map((threshold) => ({
@@ -88,19 +117,12 @@ export function useChartOption(
       },
     }));
 
-    const legendData: string[] = ["BTC 价格", metric.value.label];
-    if (isBarMetric) {
-      if (hodlerBar) legendData.push(hodlerBar.label);
-      if (spentBar) legendData.push(spentBar.label);
-    }
+    const vis = visibility.value;
 
-    // grid bottom 72 reserves room for x-axis labels above the slider.
-    const grids = isBarMetric
-      ? [
-          { left: 58, right: 68, top: 32, bottom: "48%" },
-          { left: 58, right: 68, top: "62%", bottom: 72 },
-        ]
-      : [{ left: 58, right: 68, top: 32, bottom: 72 }];
+    // One plot area keeps the active bar series inside the main chart. Its
+    // right-side axis uses an expanded range so bars occupy the lower band
+    // without becoming an unreadable sliver.
+    const grids = [{ left: 58, right: 68, top: 32, bottom: 72 }];
 
     const categoryAxis = (gridIndex: number, boundaryGap: boolean) => ({
       type: "category" as const,
@@ -110,7 +132,7 @@ export function useChartOption(
       axisLine: { lineStyle: { color: "#526260" } },
       axisLabel: { color: "#8fa19e", fontSize: 10 },
     });
-    const xAxes = isBarMetric ? [categoryAxis(0, false), categoryAxis(1, true)] : [categoryAxis(0, false)];
+    const xAxes = [categoryAxis(0, false)];
 
     const priceAxis = logPrice.value
       ? {
@@ -145,6 +167,7 @@ export function useChartOption(
         type: "value" as const,
         name: metric.value.unit,
         gridIndex: 0,
+        show: !isBarMetric,
         min: indBounds.min,
         max: indBounds.max,
         nameTextStyle: { color: "#c98a5d", fontSize: 10 },
@@ -152,33 +175,29 @@ export function useChartOption(
         splitLine: { show: false },
       },
     ];
+    const activeBarBounds = showHodlerBar ? hodlerBounds : spentBounds;
+    const activeBarSeries = showHodlerBar ? hodlerBar : spentBar;
+    const activeBarColor = showHodlerBar ? "#c98a5d" : "#7fa6c0";
     const yAxes = isBarMetric
       ? [
           ...yAxesBase,
           {
             type: "value" as const,
-            name: "占供应 %",
-            gridIndex: 1,
-            min: hodlerBounds.min,
-            max: hodlerBounds.max,
-            nameTextStyle: { color: "#c98a5d", fontSize: 10 },
-            axisLabel: { color: "#c98a5d", fontSize: 10 },
-            splitLine: { lineStyle: { color: "#29383a" } },
-          },
-          {
-            type: "value" as const,
-            name: "占比 %",
-            gridIndex: 1,
-            min: spentBounds.min,
-            max: spentBounds.max,
-            nameTextStyle: { color: "#7fa6c0", fontSize: 10 },
-            axisLabel: { color: "#7fa6c0", fontSize: 10 },
+            position: "right" as const,
+            name: activeBarSeries?.unit ?? "占比 %",
+            gridIndex: 0,
+            min: activeBarBounds.min,
+            max: activeBarBounds.max,
+            nameTextStyle: { color: activeBarColor, fontSize: 10 },
+            axisLabel: { color: activeBarColor, fontSize: 10 },
+            axisLine: { show: true, lineStyle: { color: activeBarColor } },
             splitLine: { show: false },
           },
         ]
       : yAxesBase;
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    // Bear-bottom markers belong to the price context, so the vertical dashed
+    // lines remain available even when a bar metric omits its own line.
     const seriesArr: any[] = [
       {
         name: "BTC 价格",
@@ -188,10 +207,17 @@ export function useChartOption(
         showSymbol: false,
         smooth: true,
         data: pricePoints.map((p) => p.value),
-        lineStyle: { width: 2, color: "#9bc0b8" },
-        areaStyle: { color: "rgba(155, 192, 184, 0.08)" },
+        lineStyle: { width: 2, color: "#9bc0b8", opacity: vis.price ? 1 : 0 },
+        areaStyle: { color: "rgba(155, 192, 184, 0.08)", opacity: vis.price ? 1 : 0 },
+        markLine: {
+          symbol: ["none", "none"],
+          silent: true,
+          data: vis.bottoms ? bottomLines : [],
+        },
       },
-      {
+    ];
+    if (!isBarMetric) {
+      seriesArr.push({
         name: metric.value.label,
         type: "line",
         xAxisIndex: 0,
@@ -200,43 +226,50 @@ export function useChartOption(
         smooth: true,
         connectNulls: true,
         data: indicatorValues,
-        lineStyle: { width: 2, color: "#e2a06e" },
-        markLine: { symbol: ["none", "none"], silent: true, data: [...thresholdLines, ...bottomLines] },
-      },
-    ];
-    if (isBarMetric) {
+        lineStyle: { width: 2, color: "#e2a06e", opacity: vis.indicator ? 1 : 0 },
+        // Thresholds remain independently switchable for line metrics.
+        markLine: {
+          symbol: ["none", "none"],
+          silent: true,
+          data: vis.thresholds ? thresholdLines : [],
+        },
+      });
+    }
+    if (showHodlerBar) {
       seriesArr.push({
         name: hodlerBar?.label ?? "HODLer NPC",
         type: "bar",
-        xAxisIndex: 1,
+        xAxisIndex: 0,
         yAxisIndex: 2,
         data: hodlerValues,
-        itemStyle: { color: "#c98a5d" },
+        barWidth: "72%",
+        barGap: "-100%",
+        barCategoryGap: "40%",
+        z: 1,
+        itemStyle: { color: "#c98a5d", opacity: vis.hodler ? 0.45 : 0 },
       });
+    }
+    if (showSpentBar) {
       seriesArr.push({
         name: spentBar?.label ?? "≥155d 花费占比",
         type: "bar",
-        xAxisIndex: 1,
-        yAxisIndex: 3,
+        xAxisIndex: 0,
+        yAxisIndex: 2,
         data: spentValues,
-        itemStyle: { color: "#7fa6c0" },
+        barWidth: "42%",
+        barGap: "-100%",
+        barCategoryGap: "40%",
+        z: 2,
+        itemStyle: { color: "#7fa6c0", opacity: vis.spent ? 0.6 : 0 },
       });
     }
 
-    const xAxisIndices = isBarMetric ? [0, 1] : [0];
+    const xAxisIndices = [0];
 
     return {
       animation: false,
       color: ["#9bc0b8", "#e2a06e", "#c98a5d", "#7fa6c0"],
       grid: grids,
-      legend: {
-        top: 0,
-        left: 0,
-        itemWidth: 16,
-        itemHeight: 3,
-        textStyle: { color: "#d6e0dc", fontSize: 11 },
-        data: legendData,
-      },
       tooltip: {
         trigger: "axis",
         backgroundColor: "#1d2a2b",
@@ -266,7 +299,9 @@ export function useChartOption(
         {
           type: "inside",
           xAxisIndex: xAxisIndices,
-          moveOnMouseDrag: true,
+          // Drag-pan is handled manually in SharedChart (moveOnMouseDrag is
+          // unreliable alongside a tooltip axisPointer); keep wheel zoom here.
+          moveOnMouseDrag: false,
           moveOnMouseMove: false,
           zoomOnMouseWheel: true,
         },
@@ -274,6 +309,14 @@ export function useChartOption(
       series: seriesArr,
     };
   });
+}
+
+function compressedBarBounds(values: (number | null)[]): { min: number; max: number } {
+  const base = bounds(values);
+  const min = Math.min(0, base.min);
+  const max = Math.max(0, base.max);
+  const span = Math.max(max - min, 1);
+  return { min, max: min + span / BAR_HEIGHT_FRACTION };
 }
 
 function bounds(values: (number | null)[]): { min: number; max: number } {
