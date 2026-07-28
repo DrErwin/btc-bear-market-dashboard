@@ -70,6 +70,32 @@ _FORBIDDEN_KEY_PARTS = (
     "杠杆",
     "概率",
 )
+FORBIDDEN_OUTPUT_TERMS = (
+    "买入",
+    "卖出",
+    "买卖",
+    "做多",
+    "做空",
+    "抄底",
+    "入场",
+    "入场价",
+    "入场价格",
+    "仓位",
+    "持仓",
+    "杠杆",
+    "概率",
+    "buy",
+    "sell",
+    "long",
+    "short",
+    "leverage",
+    "probability",
+    "confidence",
+    "confidence_pct",
+    "position",
+    "position size",
+    "entry price",
+)
 _FORBIDDEN_TEXT_RE = re.compile(
     r"买入|卖出|买卖|做多|做空|抄底|入场(?:价|价格)?|仓位|持仓|杠杆|概率|"
     r"\b(?:buy|sell|long|short|leverage|probability|confidence_pct|position(?:\s+size)?|entry\s+price)\b",
@@ -297,4 +323,3 @@ def validate_analysis(payload: Mapping[str, Any]) -> dict[str, Any]:
 
 
 validate = validate_analysis
-

@@ -49,6 +49,7 @@ def _user_prompt(
     data_date: str,
     validation_feedback: str | None = None,
 ) -> str:
+    forbidden_terms = "、".join(validator.FORBIDDEN_OUTPUT_TERMS)
     correction = ""
     if validation_feedback:
         correction = (
@@ -69,6 +70,8 @@ def _user_prompt(
         "只有一个触发阈值的指标，应说它已触发唯一阈值或尚未触发唯一阈值，"
         "不得说它未触发更深档位，也不得把它和多档指标合并描述为都未触发更深档位。\n\n"
         "即使是否定句或风险提示，也不要复述任何禁止词；只描述证据、阶段和待确认条件。\n"
+        f"禁止词表（输入里出现也不能照抄）：{forbidden_terms}。\n"
+        "提及相关指标时，改用“链上花费”“供应变化”“阶段确认”等中性说法。\n"
         f"{correction}\n"
         "输出 JSON 结构（不要输出任何 JSON 以外的文字）：\n"
         "{\n"

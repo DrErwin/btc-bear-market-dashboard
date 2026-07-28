@@ -97,6 +97,10 @@ def test_optional_ai_environment_values_can_be_blank(
     assert "只有一个触发阈值的指标" in user_prompt
     assert "不得说它未触发更深档位" in user_prompt
     assert "即使是否定句或风险提示，也不要复述任何禁止词" in user_prompt
+    assert "禁止词表（输入里出现也不能照抄）" in user_prompt
+    assert "做多" in user_prompt
+    assert "持仓" in user_prompt
+    assert "链上花费" in user_prompt
 
 
 def test_rc_npc_threshold_meaning_matches_its_configured_direction() -> None:
