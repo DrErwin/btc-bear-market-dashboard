@@ -115,6 +115,14 @@ def _metric_inputs(snapshot: Mapping[str, Any]) -> list[dict[str, object]]:
         for threshold_index, raw_threshold in enumerate(raw_thresholds):
             if not isinstance(raw_threshold, Mapping):
                 raise ValueError(f"指标 {metric_id} 的阈值 {threshold_index} 必须是对象")
+            threshold_role = raw_threshold.get("role", "trigger")
+            if threshold_role not in {"trigger", "neutral"}:
+                raise ValueError(
+                    f"指标 {metric_id} 的阈值 {threshold_index} 使用未知 role: "
+                    f"{threshold_role}"
+                )
+            if threshold_role == "neutral":
+                continue
             missing_threshold = [
                 key for key in _REQUIRED_THRESHOLD_KEYS if key not in raw_threshold
             ]
@@ -187,4 +195,3 @@ def build_ai_input(snapshot: str | Path | Mapping[str, Any]) -> dict[str, object
 
 
 build_input = build_ai_input
-

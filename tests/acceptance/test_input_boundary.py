@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import copy
 import json
 from collections.abc import Mapping
 from pathlib import Path
@@ -78,8 +79,36 @@ def test_input_builder_emits_only_the_approved_snapshot_boundary() -> None:
         assert metric["category"] == source["category"]
         assert metric["role"] == source["role"]
         assert metric["current_value"] == source["current_value"]
-        assert len(metric["thresholds"]) == len(source["thresholds"])
+        trigger_thresholds = [
+            threshold
+            for threshold in source["thresholds"]
+            if threshold.get("role", "trigger") != "neutral"
+        ]
+        assert len(metric["thresholds"]) == len(trigger_thresholds)
         assert all(set(threshold) == threshold_keys for threshold in metric["thresholds"])
+
+
+def test_input_builder_excludes_neutral_chart_reference_lines() -> None:
+    snapshot = copy.deepcopy(load_snapshot())
+    thermocap = next(
+        metric for metric in snapshot["metrics"] if metric["id"] == "thermo"
+    )
+    neutral = next(
+        threshold
+        for threshold in thermocap["thresholds"]
+        if threshold["label"] == "自身4年均值（中性）"
+    )
+    neutral["role"] = "neutral"
+
+    request = build_ai_input(snapshot)
+    ai_thermocap = next(
+        metric for metric in request["metrics"] if metric["id"] == "thermo"
+    )
+
+    assert all(
+        threshold["label"] != "自身4年均值（中性）"
+        for threshold in ai_thermocap["thresholds"]
+    )
 
 
 def test_input_builder_excludes_history_external_context_and_raw_source_metadata() -> None:
@@ -106,4 +135,3 @@ def test_input_builder_excludes_history_external_context_and_raw_source_metadata
         "tier_meaning",
     }
     assert keys.isdisjoint(forbidden_keys)
-

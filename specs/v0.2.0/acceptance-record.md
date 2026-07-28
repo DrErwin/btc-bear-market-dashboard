@@ -40,6 +40,7 @@
 - **AI 边界**：`test_ai_contract.py` 验证固定词汇表、拒绝禁止措辞与缺失字段；`test_input_boundary.py` 验证 AI 输入只含白名单字段、剥离 series/来源/历史。
 - **回退**：`test_provider_no_key_returns_none` / `test_api_key_never_leaks_in_reason` 验证无 key 与失败原因不含密钥。
 - **自动纠错**：`test_invalid_ai_wording_is_rewritten_once_before_fallback` 验证首次文案出现禁止词时会完整重写一次，重写仍失败才回退。
+- **阈值边界**：`test_input_builder_excludes_neutral_chart_reference_lines` 验证图表中性线不会进入 AI 的触发阈值清单。
 - **workflow**：`.github/workflows/daily-update.yml` 每日北京时间 12:00 + 手动触发，密钥仅来自 Secret，`npm run build` 验证后才 commit。
 - **日期一致**：`run_daily` 新鲜度检查（`>max-stale-days` 则 skipped），`validate_packet` 强制 analysis_date == data_date。
 

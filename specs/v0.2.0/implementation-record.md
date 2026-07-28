@@ -58,7 +58,7 @@
 
 **AI 边界**（`services/ai/`）：
 - `contract.py`：固定阶段/类别/状态/一致性词汇表 + JSON schema。
-- `input_builder.py`：从 snapshot 白名单取字段，剥离 series/来源/历史，只发可公开归纳的指标事实。
+- `input_builder.py`：从 snapshot 白名单取字段，剥离 series/来源/历史，只发可公开归纳的指标事实；图表中性参考线不发送给 AI，避免被误算为触发阈值。
 - `validator.py`：拒绝禁止措辞（买卖/概率/杠杆等）、未知词汇、缺字段。
 - `provider.py`：OpenAI 兼容 chat 调用（默认 GLM-5.2，开启深度思考并使用最高推理强度）；首次输出不合规时携带校验原因自动重写一次，第二次仍失败才返回 `(None, reason)` 触发回退。
 

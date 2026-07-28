@@ -119,6 +119,7 @@ def _build_metric(ind: IndicatorSpec) -> dict:
             "direction": ind.direction,
             "label": display_thr["label"],
             "meaning": display_thr["meaning"],
+            "role": display_thr.get("role", "trigger"),
         })
 
     return {

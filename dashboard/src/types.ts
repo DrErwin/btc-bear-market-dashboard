@@ -14,6 +14,7 @@ export interface Threshold {
   direction: "below" | "above";
   label: string;
   meaning: string;
+  role?: "trigger" | "neutral";
 }
 
 export interface Metric {
