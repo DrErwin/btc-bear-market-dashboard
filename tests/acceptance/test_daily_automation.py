@@ -93,6 +93,8 @@ def test_optional_ai_environment_values_can_be_blank(
     assert "只有触发阈值的指标才能列入支持证据" in user_prompt
     assert "未触发的指标只能列入阻碍、反面证据或待确认条件" in user_prompt
     assert "核心或辅助是指标角色，不是类别角色" in user_prompt
+    assert "只有一个触发阈值的指标" in user_prompt
+    assert "不得说它未触发更深档位" in user_prompt
     assert "即使是否定句或风险提示，也不要复述任何禁止词" in user_prompt
 
 
