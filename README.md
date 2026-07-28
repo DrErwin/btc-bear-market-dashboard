@@ -12,12 +12,12 @@
 
 ## v0.2.0 能力
 
-- **完整数据包 + 整包回退**：页面只读一份 `packet.json`；每日更新要么整包成功，要么继续展示上一份完整成功包，不混用不同日期的数据。
+- **完整数据包 + AI 解释回退**：页面只读一份 `packet.json`；AI 失败时保留本次数据，并明确标记今日 AI 不可用，页面显示上一份成功解释。
 - **图表时间轴与交互缩放**：6 月 / 1 年 / 2 年 / 4 年 / 全量预设、滚轮缩放、拖动平移、纵坐标随可视范围自动适配。
 - **HODLer 投降 + ≥155d 花费价值柱状图**：主图下方两个独立柱状系列，与主图共享同一时间窗口。
 - **每日自动更新**：GitHub Actions 每天北京时间 12:00 抓取公开链上数据 → 派生 16 指标 → GLM-5.2 深度分析 → 合规校验 → 原子发布；密钥只存 GitHub Secrets。
 
-详见 [实现记录](specs/v0.2.0/implementation-record.md) 与 [验收记录](specs/v0.2.0/acceptance-record.md)。
+详见 [每日自动更新机制](specs/v0.2.0/daily-automation.md)、[实现记录](specs/v0.2.0/implementation-record.md)与[验收记录](specs/v0.2.0/acceptance-record.md)。
 
 ## 本地运行
 
