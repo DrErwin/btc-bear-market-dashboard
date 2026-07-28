@@ -460,6 +460,18 @@ def ai_contract_flow() -> None:
         [
             "-q",
             str(ROOT / "tests" / "acceptance" / "test_ai_contract.py"),
+            str(
+                ROOT
+                / "tests"
+                / "acceptance"
+                / "test_ai_semantic_contract.py"
+            ),
+            str(
+                ROOT
+                / "tests"
+                / "acceptance"
+                / "test_daily_automation.py"
+            ),
             str(ROOT / "tests" / "acceptance" / "test_input_boundary.py"),
             str(ROOT / "tests" / "acceptance" / "test_packet_contract.py"),
             str(ROOT / "tests" / "acceptance" / "test_v024_chart_data.py"),

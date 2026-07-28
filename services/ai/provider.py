@@ -23,7 +23,7 @@ from datetime import date
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
-from . import validator
+from . import semantic_validator, validator
 from .contract import (
     ALLOWED_STAGES,
     CATEGORY_IDS,
@@ -65,6 +65,8 @@ def _user_prompt(
         "direction=above 时 current_value 大于阈值才算触发。\n"
         "只有触发阈值的指标才能列入支持证据；未触发的指标只能列入阻碍、反面证据或待确认条件，"
         "不能因为数值看起来偏高、偏低、为正或为负就自行改变阈值方向。\n"
+        "compact.support 与 detailed.supporting 中不得出现任何未触发指标的名称或数值，"
+        "即使只是补充背景也不行；请把它们全部放到 obstacle 或 contrary。\n"
         "核心或辅助是指标角色，不是类别角色；不要把类别称为核心类别或辅助类别，也不要把包含核心指标的类别概括为辅助类别。\n\n"
         "描述阈值档位时必须先看该指标实际提供了几个触发阈值："
         "只有一个触发阈值的指标，应说它已触发唯一阈值或尚未触发唯一阈值，"
@@ -72,6 +74,8 @@ def _user_prompt(
         "即使是否定句或风险提示，也不要复述任何禁止词；只描述证据、阶段和待确认条件。\n"
         f"禁止词表（输入里出现也不能照抄）：{forbidden_terms}。\n"
         "提及相关指标时，改用“链上花费”“供应变化”“阶段确认”等中性说法。\n"
+        "Reserve Risk 的数值进入周期低位，含义是长期持有信念进入周期高位，绝不能写成持有信念低位。\n"
+        "HODLer 的零阈值不要改名为“积累/链上花费分界”，请称为“长期供应净变化零线”。\n"
         f"{correction}\n"
         "输出 JSON 结构（不要输出任何 JSON 以外的文字）：\n"
         "{\n"
@@ -235,6 +239,7 @@ def call_ai(
 
         try:
             validator.validate_analysis(raw)
+            semantic_validator.validate_analysis_semantics(raw, ai_input)
         except validator.InvalidAnalysisError as exc:
             if attempt == 0:
                 validation_feedback = "；".join(exc.errors[:3])

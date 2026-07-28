@@ -7,6 +7,7 @@ from pathlib import Path
 
 from services.ai import provider
 from services.data.packet_display import BY_CANONICAL
+from tests.acceptance.analysis_fixture import build_valid_analysis
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -39,7 +40,7 @@ def test_optional_ai_environment_values_can_be_blank(
     monkeypatch,
 ) -> None:
     packet = json.loads(PACKET_PATH.read_text(encoding="utf-8"))
-    visible_analysis = packet["analysis"] or packet["fallback"]
+    visible_analysis = build_valid_analysis(packet)
     captured: dict[str, object] = {}
 
     class FakeResponse:
@@ -93,6 +94,7 @@ def test_optional_ai_environment_values_can_be_blank(
     user_prompt = captured["body"]["messages"][1]["content"]
     assert "只有触发阈值的指标才能列入支持证据" in user_prompt
     assert "未触发的指标只能列入阻碍、反面证据或待确认条件" in user_prompt
+    assert "detailed.supporting 中不得出现任何未触发指标" in user_prompt
     assert "核心或辅助是指标角色，不是类别角色" in user_prompt
     assert "只有一个触发阈值的指标" in user_prompt
     assert "不得说它未触发更深档位" in user_prompt
@@ -101,6 +103,8 @@ def test_optional_ai_environment_values_can_be_blank(
     assert "做多" in user_prompt
     assert "持仓" in user_prompt
     assert "链上花费" in user_prompt
+    assert "长期持有信念进入周期高位" in user_prompt
+    assert "长期供应净变化零线" in user_prompt
 
 
 def test_rc_npc_threshold_meaning_matches_its_configured_direction() -> None:
@@ -115,7 +119,7 @@ def test_invalid_ai_wording_is_rewritten_once_before_fallback(
     monkeypatch,
 ) -> None:
     packet = json.loads(PACKET_PATH.read_text(encoding="utf-8"))
-    visible_analysis = packet["analysis"] or packet["fallback"]
+    visible_analysis = build_valid_analysis(packet)
     invalid = copy.deepcopy(visible_analysis)
     invalid["detailed"]["contrary"] = "建议买入"
     responses = [invalid, visible_analysis]
@@ -170,7 +174,7 @@ def test_transient_ai_timeout_is_retried_once(
     monkeypatch,
 ) -> None:
     packet = json.loads(PACKET_PATH.read_text(encoding="utf-8"))
-    visible_analysis = packet["analysis"] or packet["fallback"]
+    visible_analysis = build_valid_analysis(packet)
     attempts = 0
 
     class FakeResponse:
