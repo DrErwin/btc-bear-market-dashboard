@@ -26,18 +26,17 @@ METRICS = [
 def _thresholds(metric_id: str) -> list[dict[str, object]]:
     if metric_id == "mvrv":
         return [
-            {"value": 1.0, "direction": "below", "label": "成本平衡线", "meaning": "进入估值压力"},
-            {"value": 0.8, "direction": "below", "label": "深度低估线", "meaning": "进入深度估值压力"},
+            {"value": 1.0, "direction": "below", "label": "观察区", "meaning": "进入估值压力"},
+            {"value": 0.8, "direction": "below", "label": "深度压力区", "meaning": "进入深度估值压力"},
         ]
     if metric_id == "aviv":
         return [
-            {"value": 0.65, "direction": "below", "label": "低估观察线", "meaning": "估值复核"},
-            {"value": 0.55, "direction": "below", "label": "深度低估参考", "meaning": "深度复核"},
+            {"value": 0.55, "direction": "below", "label": "深度压力区", "meaning": "深度复核"},
         ]
     if metric_id == "puell":
         return [
-            {"value": 1.0, "direction": "below", "label": "低收入区上界", "meaning": "矿工压力"},
-            {"value": 0.5, "direction": "below", "label": "历史深压参考", "meaning": "深度矿工压力"},
+            {"value": 0.6, "direction": "below", "label": "观察区", "meaning": "矿工压力"},
+            {"value": 0.5, "direction": "below", "label": "深度压力区", "meaning": "深度矿工压力"},
         ]
     if metric_id in {"rul-z", "cvdd"}:
         return [{"value": 2.0 if metric_id == "rul-z" else 0.5, "direction": "above", "label": "观察线", "meaning": "辅助压力"}]

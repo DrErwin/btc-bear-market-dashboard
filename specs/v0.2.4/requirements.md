@@ -1,25 +1,30 @@
 # v0.2.4 — 指标参考线与多曲线同步
 
 > 状态：已实现并通过本地验收。本文件记录 v0.2.4 的范围与验收基线。
+>
+> 版本关系：本版本只定义图表层能力。状态阈值统一与 STH-MVRV 每日动态阈值属于后续 [v0.3.1](../v0.3.1/requirements.md)。
 
 ## 1. 目标
 
-让当前看板每个指标的图表参考线、参考线名称和可视曲线与指标验证面板完全一致。一个导出的参考线就是看板中的一条可见横向参考线；验证面板中的每一条可视曲线也都要在看板中显示，不能合并、遗漏或沿用旧名称。
+让当前看板的图表参考线、参考线名称和可视曲线与指标验证面板一致。验证面板中的可视曲线要完整保留，不能合并、遗漏或沿用旧名称。
 
 ## 2. 权威来源与边界
 
-- 唯一来源：本机导出文件 `C:\Users\57652\Downloads\btc-indicator-config-2026-07-28.json`。
-- 文件校验值（SHA-256）：`CAD0028AF77A30065A42D0C47181DEB8256434DC2410C4B2128391D4477EBC98`。
-- 实现应读取每个 `metrics.<导出键>.references[]` 中的 `value` 和 `label`；名称与数值均以导出文件为准，不手工改写。
+- 版本化来源：仓库内的 `specs/v0.2.4/btc-indicator-config-2026-07-28.json`。
+- 文件校验值（SHA-256）：`435BB97DF65A69F1C50E084AB3C18A048D2AED57699B1E2945BDC1B72C2AFF81`。
+- 本版本读取每个 `metrics.<导出键>.references[]` 中的 `value`、`label` 和 `direction`，写入图表参考线。
+- STH-MVRV 导出中的“无参考线”表示图表不绘制水平参考线。
 - 曲线清单与逐日数值来源：`prototype-indicator-timeline/timeline-data.json` 的 `metrics[].lines[]`；当前核验文件的 SHA-256 为 `15C6FF03ABDD0663F9357BC8675D670C637C4F15574236915CBC5B48D6FA163A`。
 - 当前导出中 16 个指标的 `lineMode` 均为 `all`，因此每个 `metrics[].lines[]` 条目都必须保留在数据包中。看板默认显示全部曲线，唯一经产品确认的例外是 `sth-mvrv.primary`：保留原始数据以便追溯，但不在图表、提示或图例中绘制。
-- 不改变数据来源、AI 阶段判断或观察区状态。为承载新增曲线，允许对看板数据包 `series.metrics` 增加向后兼容的 `lines[]` 字段；既有 `points` 和 `thresholds` 字段保持可用。
+- 为承载新增曲线，允许对看板数据包 `series.metrics` 增加向后兼容的 `lines[]` 字段；既有 `points` 和 `thresholds` 字段保持可用。
+- 本版本不改变 AI 输入、证据判断或阶段计算；后续 v0.3.1 才将图表阈值用于状态判断。
 
 ## 3. 显示规则
 
 - 每条导出参考线都以独立的横向虚线显示，在线尾显示其导出名称；同一指标的多条线必须同时可见。
 - 参考线数量、数值和名称必须一一对应。不能只显示最深的一条，也不能用“阈值线”等笼统名称替代具体名称。
-- 验证面板中 `metrics[].lines[]` 的每一条曲线都必须保留原始 `id`、`label`、数值和坐标轴归属。除 `sth-mvrv.primary` 外，均作为独立图表系列显示；`axis = price` 的曲线使用 BTC 价格纵轴，`axis = indicator` 的曲线使用指标纵轴。隐藏 STH 主线时，仍通过不可见锚点显示其指标轴参考线。
+- 验证面板中 `metrics[].lines[]` 的每一条曲线都必须保留原始 `id`、`label`、数值和坐标轴归属。除 `sth-mvrv.primary` 外，均作为独立图表系列显示；`axis = price` 的曲线使用 BTC 价格纵轴，`axis = indicator` 的曲线使用指标纵轴。
+- STH-MVRV 图表没有水平参考线，也不显示“阈值线”开关；仍保留三条 STH-RP 战术价格曲线。
 - 3 日与 7 日平滑线是独立趋势辅助曲线，不是参考线，必须同时显示，不能只留下原始日线或用前视平滑重算替代验证面板的序列。
 - 所有指标数据线均使用实线；主线保留主色，次要线只按红、绿、蓝循环，不使用紫色。BTC、主线、次要线、参考线与熊底线均使用较细线宽；参考线和熊底线仍为更细的虚线，以区分数据与标记。标签不能相互遮挡；手机宽度 390px 时不可造成横向滚动。
 - HODLer 与 ≥155d 继续遵循 v0.2.3：不恢复橙色指标曲线。它们的参考线叠加在各自柱状图的右侧刻度上，不新建第二张图。
@@ -33,24 +38,24 @@
 
 | 看板指标 ID | 导出键 | 应显示的参考线 |
 |---|---|---|
-| `mvrv` | `mvrv` | 成本平衡线 = 1；深度低估观察线 = 0.8 |
-| `aviv` | `aviv` | 低估观察线 = 0.55；深度低估参考 = 0.5 |
-| `sth-mvrv` | `sth_mvrv_price` | 1.5·MAD（无前视） = 0.6370026843 |
-| `psip` | `psip` | 盈亏供应平衡 = 0.5 |
-| `sipl` | `sipl` | 两线理论交错参考 = -0.1 |
-| `rup` | `relative_unrealized_profit` | 深低值观察线 = 0.37 |
-| `rul-z` | `relative_unrealized_loss_zscore_4y` | 高于均值2σ（投降区） = 2；高于均值2.5σ（深度投降） = 2.5 |
-| `rc-npc` | `realized_cap_relative_npc_30d` | 资本扩张/收缩分界 = -0.04 |
-| `asopr` | `asopr` | 投降 = 0.9 |
-| `hodler` | `hodler_npc_30d` | 净积累/净释放分界 = 0 |
-| `spent155` | `spent_value_ge155d_share` | 全样本90%分位（探索） = 0.02448369429 |
-| `seller` | `seller_exhaustion` | 全样本10%分位（探索） = 0.03544264742 |
-| `puell` | `puell_multiple` | 低收入区上界 = 0.7；历史深压参考 = 0.5 |
-| `thermo` | `thermocap_multiple_zscore` | z·过去周期10%分位（先触发） = -0.6147138165；z·过去周期5%分位（深部） = -0.8703706199；自身4年均值（中性） = 0 |
-| `cvdd` | `cvdd_proximity` | 高于CVDD 50% = 2.5 |
-| `reserve` | `reserve_risk_zscore` | z·过去周期10%分位 = -1.320779819；z·过去周期5%分位 = -1.892782115 |
+| `mvrv` | `mvrv` | 观察区 = 1；深度压力区 = 0.8 |
+| `aviv` | `aviv` | 深度压力区 = 0.55 |
+| `sth-mvrv` | `sth_mvrv_price` | 无水平参考线 |
+| `psip` | `psip` | 观察区 = 0.5；极端压力区 = 0.45 |
+| `sipl` | `sipl` | 深度压力区 = -0.05 |
+| `rup` | `relative_unrealized_profit` | 深度压力区 = 0.35 |
+| `rul-z` | `relative_unrealized_loss_zscore_4y` | 观察区 = 2；深度压力区 = 2.5 |
+| `rc-npc` | `realized_cap_relative_npc_30d` | 深度压力区 = -0.04 |
+| `asopr` | `asopr` | 观察区 = 0.95；深度压力区 = 0.9 |
+| `hodler` | `hodler_npc_30d` | 深度压力区 = 0 |
+| `spent155` | `spent_value_ge155d_share` | 90%分位观察区 = 0.03 |
+| `seller` | `seller_exhaustion` | 10%分位观察区 = 0.05 |
+| `puell` | `puell_multiple` | 观察区 = 0.6；深度压力区 = 0.5 |
+| `thermo` | `thermocap_multiple_zscore` | 10%分位定投区 = -0.6147138165；5%分位深度压力区 = -0.8703706199 |
+| `cvdd` | `cvdd_proximity` | 极端压力区 = 5 |
+| `reserve` | `reserve_risk_zscore` | 10%分位观察区 = -1.320779819；5%分位深度压力区 = -1.892782115 |
 
-多条参考线的重点验收对象为：MVRV、AVIV、RUL · 4年 z-score、Puell Multiple、Thermocap Multiple · 周期 z、Reserve Risk · 周期。其中 Thermocap Multiple · 周期 z 必须同时显示三条线。
+多条参考线的重点验收对象为：MVRV、PSIP、RUL · 4年 z-score、aSOPR、Puell Multiple、Thermocap Multiple · 周期 z、Reserve Risk · 周期。
 
 ## 5. 多曲线清单
 
@@ -67,9 +72,10 @@
 
 ## 6. 验收要求
 
-- 自动测试读取同一份导出配置（或经 SHA-256 绑定的测试副本），逐项检查上述 16 个指标的参考线数量、数值与名称。
+- 自动测试读取同一份导出配置，逐项检查图表参考线的数量、数值、方向与名称。
+- 自动测试确认 STH-MVRV 图表阈值数量为 0，页面不显示“阈值线”开关。
 - 自动测试读取同一份时间线曲线清单（或经 SHA-256 绑定的测试副本），逐项检查曲线的 `id`、名称、坐标轴、日期和数值；不得只检查图例文字。
-- 浏览器测试分别检查一条、两条和三条参考线场景；MVRV、Puell、Thermocap 和 Reserve Risk 必须覆盖。
+- 浏览器测试分别检查一条和两条参考线场景；MVRV、Puell、Thermocap 和 Reserve Risk 必须覆盖。
 - 浏览器测试必须覆盖 STH-MVRV 的三条价格线及主线缺席、SIPL 的两个分组开关、aSOPR 的三个独立开关以及 CVDD 价格地板；价格轴曲线不得错误绘制到指标纵轴。
 - HODLer 与 ≥155d 的图表必须仍然只有柱状数据，不得出现指标曲线；其各自的参考线须在对应右侧刻度下可见且名称正确。
 - 桌面与 390px 手机截图中，所有同时显示的参考线标签可辨认、无横向溢出。
@@ -80,5 +86,5 @@
 
 ## 7. 范围边界
 
-- 不修改数据源、AI 阶段判断、AI 输入输出或部署配置；新增 `series.metrics[].lines[]` 只用于向后兼容地承载图表曲线。
+- 不修改数据来源、AI 阶段判断、AI 输入输出或部署配置。
 - 不把参考线同步解释为交易建议、价格预测或仓位建议。

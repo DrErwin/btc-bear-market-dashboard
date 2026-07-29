@@ -15,6 +15,7 @@ from dataclasses import dataclass, field
 from datetime import date
 
 from . import derive
+from .chart_references import references_for
 
 
 # --- Dashboard six-category taxonomy (English ids, fixed order) ------------
@@ -174,16 +175,19 @@ def compute_indicators(
 
     # --- STH-MVRV tactical-price levels (three statistical methods) ---
     sth_rp = derive.aligned_ratio(raw["sth_realized_cap"], raw["sth_supply"])
-    sth_stats = derive.past_cycle_stats(sth_mvrv)
+    # These tactical levels are deliberately recalculated from all history
+    # available at each daily run. They are live status thresholds, not frozen
+    # values copied from a validation export.
+    sth_stats = derive.live_anchored_stats(sth_mvrv)
     _sigma = sth_stats["pstdev"]
     _mad_sigma = 1.4826 * sth_stats["mad"]
     sth_levels = {
-        "q5": derive.past_cycle_quantile(sth_mvrv, 0.05),
+        "q5": derive.live_anchored_quantile(sth_mvrv, 0.05),
         "mean_1_5": sth_stats["mean"] - 1.5 * _sigma,
         "median_1_5": sth_stats["median"] - 1.5 * _mad_sigma,
     }
     sth_ladders = {key: derive.ladder(level, sth_rp) for key, level in sth_levels.items()}
-    log.append("STH-MVRV tactical-price levels (window [2018, 2022-bottom], no lookahead):")
+    log.append("STH-MVRV tactical-price levels (live anchored history, recalculated daily):")
     for _key in ("q5", "mean_1_5", "median_1_5"):
         log.append(f"  {_key:<12} MVRV={sth_levels[_key]:.5f}")
 
@@ -234,15 +238,15 @@ def compute_indicators(
         ),
         spec(
             "sth_mvrv_price", label="STH-MVRV 战术价位（三法合并）", unit="ratio",
-            description="STH-MVRV 三套统计抄底档合并：5%分位 / 1.5σ / 1.5·MAD；价位阶梯 = 档位 × STH-RP（Price = STH-MVRV × STH-RP）。",
-            formula="Q5 / (mean−1.5σ) / (median−1.5·1.4826·MAD)，各 × STH-RP；阈值在无前视窗口 [2018,2022底] 上算",
-            source="BRK / Bitview 基础日线", method="自行计算（无前视）",
-            caveat="三法对照：5%分位最浅、1.5σ居中偏浅、1.5·MAD最深。references[0]=5%分位为触发线。阈值无前视。",
+            description="STH-MVRV 三套实时统计档位：5%分位 / 1.5σ / 1.5·MAD；价位阶梯 = 档位 × STH-RP（Price = STH-MVRV × STH-RP）。",
+            formula="Q5 / (mean−1.5σ) / (median−1.5·1.4826·MAD)，各 × STH-RP；每日用最新可用历史重新计算",
+            source="BRK / Bitview 基础日线", method="自行计算（每日更新）",
+            caveat="三法对照：5%分位为观察区、1.5σ为深度压力区、1.5·MAD为极端压力区。三档用于状态计算，图表不绘制水平参考线。",
             primary=sth_mvrv,
             references=[
-                _reference(sth_levels["q5"], "5%分位（无前视）"),
-                _reference(sth_levels["mean_1_5"], "1.5σ（无前视）"),
-                _reference(sth_levels["median_1_5"], "1.5·MAD（无前视）"),
+                _reference(sth_levels["q5"], "观察区"),
+                _reference(sth_levels["mean_1_5"], "深度压力区"),
+                _reference(sth_levels["median_1_5"], "极端压力区"),
             ],
             direction="below",
             extra_lines=[
@@ -401,6 +405,18 @@ def compute_indicators(
             direction="below",
         ),
     ]
+
+    # The validation export is the single source of truth for status and chart
+    # thresholds. STH-MVRV is the one exception: its three status thresholds
+    # are recalculated above on every run and remain hidden from chart markLines.
+    for indicator in indicators:
+        if indicator.id == "sth_mvrv_price":
+            continue
+        chart_config = references_for(indicator.id)
+        if chart_config is None:
+            continue
+        indicator.references = [dict(reference) for reference in chart_config["references"]]
+        indicator.direction = chart_config["direction"]
 
     # Stable display order: by category, then catalogue order.
     category_rank = {name: index for index, name in enumerate(CATEGORY_ORDER)}

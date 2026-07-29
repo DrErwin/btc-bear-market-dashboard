@@ -2,7 +2,9 @@
 
 公开、只读的研究型看板：把 16 个 BTC 周期指标整理成六类证据，展示当前市场阶段、证据一致性、阈值位置、共享图表与持有者卖出柱状图。它不预测确切最低点，也不提供交易建议。
 
-> 当前线上版本：`v0.2.4`（真实每日数据 + AI 自动分析，已上线）；系统每天北京时间 12:00 自动尝试更新。
+> 当前公开界面版本记录：`v0.2.4`；系统每天北京时间 12:00 自动尝试更新。2026-07-29 现场核对公开 `packet.json` 时，线上数据契约仍为 `schema/config 0.2.0`，因此“界面版本”和“数据契约版本”不能混为一谈。
+>
+> 当前本地开发基线：`v0.3.1`。其中 v0.3.0 建立证据判断与 AI 阶段约束，v0.3.1 统一图表和状态阈值；运行包标识仍为 `0.3.0`，待正式发布时升级。本轮尚未提交、推送或部署。
 
 ## 在线访问
 
@@ -17,7 +19,7 @@
 - **HODLer 投降 + ≥155d 花费价值柱状图**：主图下方两个独立柱状系列，与主图共享同一时间窗口。
 - **每日自动更新**：GitHub Actions 每天北京时间 12:00 抓取公开链上数据 → 派生 16 指标 → GLM-5.2 深度分析 → 合规校验 → 原子发布；密钥只存 GitHub Secrets。
 
-详见 [每日自动更新机制](specs/v0.2.0/daily-automation.md)、[实现记录](specs/v0.2.0/implementation-record.md)与[验收记录](specs/v0.2.0/acceptance-record.md)。
+详见 [实现记录](specs/v0.2.0/implementation-record.md)与[验收记录](specs/v0.2.0/acceptance-record.md)。
 
 ## 本地运行
 
@@ -56,6 +58,6 @@ npm run build
 
 ## 数据与口径
 
-指标派生、无前视阈值方法与 log+4 年 z-score 跨周期归一化在 `services/data/`；固定阶段词汇表、AI 输入白名单与输出校验在 `services/ai/`。指标定义与可实现性见 [v0.1.0 指标研究](specs/v0.1.0/bear-market-indicator-expandability-research.md)。
+指标派生、动态阈值方法与 log+4 年 z-score 跨周期归一化在 `services/data/`；证据整理与阶段约束在 `services/evidence/`；固定阶段词汇表、AI 输入白名单与输出校验在 `services/ai/`。版本关系见 [版本文档索引](specs/README.md)，指标定义与可实现性见 [v0.1.0 指标研究](specs/v0.1.0/bear-market-indicator-expandability-research.md)。
 
 仅作公开研究参考 · 不构成交易建议。

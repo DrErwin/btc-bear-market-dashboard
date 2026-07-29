@@ -43,6 +43,14 @@ def load_packet_fixture(name: str = "packet.json") -> dict:
     return json.loads((DIST / "data" / name).read_text(encoding="utf-8"))
 
 
+def reference_labels(metric_id: str) -> tuple[str, ...]:
+    packet = load_packet_fixture()
+    return tuple(
+        threshold["label"]
+        for threshold in packet["series"]["metrics"][metric_id]["thresholds"]
+    )
+
+
 def wait_for_server() -> None:
     deadline = time.time() + 15
     while time.time() < deadline:
@@ -237,7 +245,8 @@ def success_flow(page: Page) -> None:
                 legend_text = page.locator(".chart-legend").inner_text()
                 assert metric_label not in legend_text, "STH-MVRV 主指标线不应保留图例开关"
                 expect(page.locator(".chart-legend")).to_contain_text("5%分位 × STH-RP")
-                expect(page.locator(".chart-legend")).to_contain_text("阈值线")
+                assert "阈值线" not in legend_text, "STH-MVRV 不应显示参考线开关"
+                assert page.locator(".chart-legend .legend-line.threshold").count() == 0
             else:
                 expect(page.locator(".chart-legend")).to_contain_text(metric_label)
                 expect(page.locator(".chart-legend")).to_contain_text("阈值线")
@@ -248,7 +257,12 @@ def success_flow(page: Page) -> None:
     page.get_by_text("估值与成本", exact=True).click()
     page.locator(".metric-card").filter(has_text="STH-MVRV 战术价位").first.click()
     sth_aria = page.locator(".shared-chart").get_attribute("aria-label") or ""
-    for label in ("5%分位 × STH-RP", "1.5σ × STH-RP", "1.5·MAD × STH-RP", "1.5·MAD（无前视）"):
+    for label in (
+        "5%分位 × STH-RP",
+        "1.5σ × STH-RP",
+        "1.5·MAD × STH-RP",
+        *reference_labels("sth-mvrv"),
+    ):
         assert label in sth_aria, f"STH-MVRV 图表缺少曲线/参考线：{label}"
     assert "STH-MVRV 战术价位（三法合并）" not in sth_aria, "STH-MVRV 主指标线不应参与图表"
     expect(page.locator(".chart-legend")).to_contain_text("5%分位 × STH-RP")
@@ -256,30 +270,40 @@ def success_flow(page: Page) -> None:
     page.get_by_text("供应盈亏", exact=True).click()
     page.locator(".metric-card").filter(has_text="SIPL").first.click()
     sipl_aria = page.locator(".shared-chart").get_attribute("aria-label") or ""
-    for label in ("Supply in Profit / Loss", "Supply in Loss", "盈利% − 亏损%", "两线理论交错参考"):
+    for label in (
+        "Supply in Profit / Loss",
+        "Supply in Loss",
+        "盈利% − 亏损%",
+        *reference_labels("sipl"),
+    ):
         assert label in sipl_aria, f"SIPL 图表缺少曲线/参考线：{label}"
 
     page.get_by_text("链上资本流", exact=True).click()
     page.locator(".metric-card").filter(has_text="aSOPR").first.click()
     asopr_aria = page.locator(".shared-chart").get_attribute("aria-label") or ""
-    for label in ("aSOPR", "3日滞后均值（趋势辅助）", "7日滞后均值（趋势辅助）", "投降"):
+    for label in (
+        "aSOPR",
+        "3日滞后均值（趋势辅助）",
+        "7日滞后均值（趋势辅助）",
+        *reference_labels("asopr"),
+    ):
         assert label in asopr_aria, f"aSOPR 图表缺少曲线/参考线：{label}"
 
     page.get_by_text("长期成本锚", exact=True).click()
     page.locator(".metric-card").filter(has_text="CVDD 接近程度").first.click()
     cvdd_aria = page.locator(".shared-chart").get_attribute("aria-label") or ""
-    for label in ("CVDD 接近程度", "CVDD 价格地板", "高于CVDD 50%"):
+    for label in ("CVDD 接近程度", "CVDD 价格地板", *reference_labels("cvdd")):
         assert label in cvdd_aria, f"CVDD 图表缺少曲线/参考线：{label}"
 
-    for category_name, metric_label, reference_labels in (
-        ("估值与成本", "MVRV", ("成本平衡线", "深度低估观察线")),
-        ("矿工压力", "Thermocap Multiple", ("z·过去周期10%分位（先触发）", "z·过去周期5%分位（深部）", "自身4年均值（中性）")),
-        ("长期成本锚", "Reserve Risk", ("z·过去周期10%分位", "z·过去周期5%分位")),
+    for category_name, metric_label, metric_id in (
+        ("估值与成本", "MVRV", "mvrv"),
+        ("矿工压力", "Thermocap Multiple", "thermo"),
+        ("长期成本锚", "Reserve Risk", "reserve"),
     ):
         page.get_by_text(category_name, exact=True).click()
         page.locator(".metric-card").filter(has_text=metric_label).first.click()
         aria = page.locator(".shared-chart").get_attribute("aria-label") or ""
-        for label in reference_labels:
+        for label in reference_labels(metric_id):
             assert label in aria, f"{metric_label} 图表缺少参考线：{label}"
 
     assert_no_restricted_language(page)
@@ -428,8 +452,8 @@ def chart_curve_toggle_flow(page: Page) -> None:
     for label in ("5%分位 × STH-RP", "1.5σ × STH-RP", "1.5·MAD × STH-RP"):
         expect(sth_legend.get_by_role("button", name=label, exact=True)).to_be_visible()
     page.locator(".shared-chart").screenshot(path=str(EVIDENCE / "v024-sth-primary-hidden.png"))
-    assert_chart_contains_colour("v024-sth-primary-hidden.png", (222, 138, 87))
-    for colour in ((214, 93, 82), (78, 155, 115), (93, 143, 203)):
+    assert_chart_contains_colour("v024-sth-primary-hidden.png", (214, 93, 82), minimum=8)
+    for colour in ((78, 155, 115), (93, 143, 203)):
         assert_chart_contains_colour("v024-sth-primary-hidden.png", colour)
     assert_chart_excludes_colour("v024-sth-primary-hidden.png", (167, 122, 194))
 

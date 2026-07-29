@@ -201,6 +201,34 @@ def quantile_list(values: list[float], probability: float) -> float:
     return _quantile_list(values, probability)
 
 
+def live_anchored_quantile(values: dict[date, float], probability: float) -> float:
+    """Recalculate a percentile from all data available since ``ANCHOR``.
+
+    Unlike ``past_cycle_quantile``, this threshold intentionally moves when a
+    new daily observation arrives. It is used by the STH-MVRV tactical levels,
+    whose current status bands must follow the latest available history.
+    """
+    sample = [value for day, value in values.items() if day >= ANCHOR]
+    if len(sample) < 30:
+        sample = list(values.values())
+    return _quantile_list(sample, probability)
+
+
+def live_anchored_stats(values: dict[date, float]) -> dict[str, float]:
+    """Recalculate mean/std/median/MAD from all data available since ``ANCHOR``."""
+    sample = [value for day, value in values.items() if day >= ANCHOR]
+    if len(sample) < 30:
+        sample = list(values.values())
+    median = statistics.median(sample)
+    mad = statistics.median([abs(value - median) for value in sample])
+    return {
+        "mean": statistics.mean(sample),
+        "pstdev": statistics.pstdev(sample),
+        "median": median,
+        "mad": mad,
+    }
+
+
 def past_cycle_quantile(values: dict[date, float], probability: float) -> float:
     """Empirical quantile over ONLY completed past-cycle data (no lookahead).
 

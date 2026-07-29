@@ -2,6 +2,7 @@
 # Everything else (prototypes, build output, caches, archives) stays local.
 /*
 !.gitignore
+!AGENTS.md
 !README.md
 !requirements.txt
 !/dashboard/

@@ -119,6 +119,7 @@ const sourceChartLines = computed<MetricLine[]>(() => {
 });
 const chartLines = computed(() => getRenderableChartLines(props.metric.id, sourceChartLines.value));
 const extraChartLines = computed(() => chartLines.value.filter((line) => line.id !== "primary"));
+const hasThresholds = computed(() => (props.series.metrics[props.metric.id]?.thresholds.length ?? 0) > 0);
 const hasDedicatedLineControls = computed(() => hasDedicatedChartLineControls(props.metric.id));
 const dedicatedLineToggleGroups = computed(() => getDedicatedChartLineToggleGroups(props.metric.id, chartLines.value));
 const showDefaultIndicatorToggle = computed(() => !hasDedicatedLineControls.value
@@ -161,7 +162,8 @@ const chartAriaLabel = computed(() => {
   const metricSeries = props.series.metrics[props.metric.id];
   const references = metricSeries?.thresholds.map((threshold) => threshold.label).join("、") || "无";
   const lines = chartLines.value.map((line) => lineDisplayLabel(line)).join("、");
-  return `BTC 价格、${props.metric.label}与阈值线、历史熊底共享图表；参考线：${references}；曲线：${lines}`;
+  const thresholdPhrase = hasThresholds.value ? "与阈值线" : "";
+  return `BTC 价格、${props.metric.label}${thresholdPhrase}、历史熊底共享图表；参考线：${references}；曲线：${lines}`;
 });
 
 interface RangeOption {
@@ -404,7 +406,7 @@ onBeforeUnmount(() => {
             <i class="legend-line extra" :style="{ backgroundColor: lineColor(line) }"></i>{{ lineDisplayLabel(line) }}
           </button>
         </template>
-        <button type="button" class="legend-toggle" :class="{ 'is-off': !visibility.thresholds }" :aria-pressed="visibility.thresholds" @click="visibility.thresholds = !visibility.thresholds"><i class="legend-line threshold"></i>阈值线</button>
+        <button v-if="hasThresholds" type="button" class="legend-toggle" :class="{ 'is-off': !visibility.thresholds }" :aria-pressed="visibility.thresholds" @click="visibility.thresholds = !visibility.thresholds"><i class="legend-line threshold"></i>阈值线</button>
       </template>
       <button type="button" class="legend-toggle" :class="{ 'is-off': !visibility.bottoms }" :aria-pressed="visibility.bottoms" @click="visibility.bottoms = !visibility.bottoms"><i class="legend-line bottom"></i>历史熊底</button>
       <template v-if="isBarMetric">

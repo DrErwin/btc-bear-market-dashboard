@@ -80,8 +80,8 @@ INDICATORS: list[IndicatorDisplay] = [
         source="BRK / Bitview 基础日线", method="自行计算",
         caveat="不能单独证明最低点已经出现；与 AVIV 属同一核心估值维度，不重复计作独立证据。",
         thresholds=[
-            {"label": "成本平衡线", "meaning": "市场价值低于全市场已实现成本基础。"},
-            {"label": "深度低估线", "meaning": "进入更深的估值压力区。"},
+            {"label": "观察区", "meaning": "MVRV 低于 1，市场价值低于全市场已实现成本基础。"},
+            {"label": "深度压力区", "meaning": "MVRV 低于 0.8，进入更深的全市场估值压力。"},
         ],
     ),
     IndicatorDisplay(
@@ -91,20 +91,19 @@ INDICATORS: list[IndicatorDisplay] = [
         source="BRK / Bitview 四条基础日线", method="自行计算（ARK × Glassnode 原始定义）",
         caveat="Bitview 成品 aviv_ratio 使用不同分子，本看板不拿它作同公式误差检查。",
         thresholds=[
-            {"label": "低估观察线", "meaning": "活跃投资者成本压力增加。"},
-            {"label": "深度低估参考", "meaning": "进入核心估值压力区。"},
+            {"label": "深度压力区", "meaning": "AVIV 低于 0.55，活跃投资者成本进入深度压力。"},
         ],
     ),
     IndicatorDisplay(
         "sth_mvrv_price", "sth-mvrv", "STH-MVRV 战术价位", "辅助", "ratio", "比率",
-        description="STH-MVRV 三套统计档位（5%分位 / 1.5σ / 1.5·MAD）作为短期持有者视角的估值档，价位阶梯 = 档位 × STH-RP。",
-        formula="Q5 / (mean−1.5σ) / (median−1.5·1.4826·MAD)；阈值在无前视窗口 [2018,2022底] 上算",
-        source="BRK / Bitview 基础日线", method="自行计算（无前视）",
-        caveat="三法对照：5%分位最浅、1.5σ居中偏浅、1.5·MAD最深。用于补充价格位置，不独立抬高整体阶段。",
+        description="STH-MVRV 三套实时统计档位（5%分位 / 1.5σ / 1.5·MAD）作为短期持有者视角的估值档，价位阶梯 = 档位 × STH-RP。",
+        formula="Q5 / (mean−1.5σ) / (median−1.5·1.4826·MAD)；每日用最新可用历史重新计算",
+        source="BRK / Bitview 基础日线", method="自行计算（每日更新）",
+        caveat="三档只用于状态计算，图表不绘制水平参考线；它属于辅助证据，不独立改变整体阶段。",
         thresholds=[
-            {"label": "5%分位（无前视）", "meaning": "最浅档：STH-MVRV 低于过去周期 5% 分位。"},
-            {"label": "1.5σ（无前视）", "meaning": "居中档：低于过去周期均值 1.5 个总体标准差。"},
-            {"label": "1.5·MAD（无前视）", "meaning": "最深档：低于过去周期中位数 1.5 个 MADσ。"},
+            {"label": "观察区", "meaning": "STH-MVRV 低于实时计算的 5% 分位。"},
+            {"label": "深度压力区", "meaning": "STH-MVRV 低于实时计算的均值减 1.5σ。"},
+            {"label": "极端压力区", "meaning": "STH-MVRV 低于实时计算的中位数减 1.5·MADσ。"},
         ],
     ),
     IndicatorDisplay(
@@ -114,8 +113,8 @@ INDICATORS: list[IndicatorDisplay] = [
         source="BRK / Bitview 基础日线", method="自行计算",
         caveat="与亏损供应指标存在结构性关联，不重复计作独立证据。",
         thresholds=[
-            {"label": "盈亏供应平衡", "meaning": "盈利供应占比降至约一半。"},
-            {"label": "广泛浮亏参考", "meaning": "盈利供应进入较低区间。"},
+            {"label": "观察区", "meaning": "盈利供应占比低于 50%。"},
+            {"label": "极端压力区", "meaning": "盈利供应占比低于 45%。"},
         ],
     ),
     IndicatorDisplay(
@@ -125,7 +124,7 @@ INDICATORS: list[IndicatorDisplay] = [
         source="BRK / Bitview 基础日线", method="自行计算",
         caveat="与 PSIP 是同一底层供应盈亏事实的另一表达；差值大于零表示盈利供应占比更高。",
         thresholds=[
-            {"label": "盈利/亏损占比平衡", "meaning": "盈利与亏损供应占比相当。"},
+            {"label": "深度压力区", "meaning": "盈利供应与亏损供应的差值低于 -5%。"},
         ],
     ),
     IndicatorDisplay(
@@ -135,8 +134,7 @@ INDICATORS: list[IndicatorDisplay] = [
         source="BRK / Bitview 基础日线", method="自行计算",
         caveat="只说明利润空间压缩，不等同于全面投降。",
         thresholds=[
-            {"label": "利润压缩线", "meaning": "未实现利润空间收窄。"},
-            {"label": "深度压缩线", "meaning": "利润空间进入较深压力区。"},
+            {"label": "深度压力区", "meaning": "相对未实现利润低于 35%。"},
         ],
     ),
     IndicatorDisplay(
@@ -146,8 +144,8 @@ INDICATORS: list[IndicatorDisplay] = [
         source="基于 RUL（恒等式推导）计算", method="滚动四年总体标准差",
         caveat="RUL 强右偏，单σ偏松；历史大底 z≈+2.8~+2.9。滚动窗口与缺失值处理会影响跨周期比较。",
         thresholds=[
-            {"label": "压力观察线", "meaning": "进入滚动四年尺度的压力区域。"},
-            {"label": "深度压力线", "meaning": "进入更深的周期压力区。"},
+            {"label": "观察区", "meaning": "RUL 高于滚动四年均值 2σ。"},
+            {"label": "深度压力区", "meaning": "RUL 高于滚动四年均值 2.5σ。"},
         ],
     ),
     IndicatorDisplay(
@@ -157,7 +155,7 @@ INDICATORS: list[IndicatorDisplay] = [
         source="BRK / Bitview Realized Cap", method="三十日变化口径",
         caveat="负值不能直接解释为阶段已完成。",
         thresholds=[
-            {"label": "资本扩张/收缩分界", "meaning": "三十日已实现资本变化由收缩转为扩张。"},
+            {"label": "深度压力区", "meaning": "三十日已实现资本相对变化低于 -4%。"},
         ],
     ),
     IndicatorDisplay(
@@ -167,7 +165,8 @@ INDICATORS: list[IndicatorDisplay] = [
         source="BRK / Bitview", method="公开成品日线（透明开源计算链）",
         caveat="短期波动较大，只用于交叉检查；3d/7d 滞后均值仅作趋势辅助，不触发。",
         thresholds=[
-            {"label": "盈亏平衡线", "meaning": "花费行为整体低于盈亏平衡。"},
+            {"label": "深度压力区", "meaning": "aSOPR 低于 0.90，链上亏损花费明显加深。"},
+            {"label": "观察区", "meaning": "aSOPR 低于 0.95，链上亏损花费开始扩大。"},
         ],
     ),
     IndicatorDisplay(
@@ -175,11 +174,9 @@ INDICATORS: list[IndicatorDisplay] = [
         description="只显示全网低估期（MVRV<1）长期不动供应的 30 日净变化占供应比例：负值=投降卖出，正值=低估期积累。",
         formula="[HODLedOrLostSupply(t) − HODLedOrLostSupply(t−30d)] / Supply；仅保留 MVRV<1",
         source="BRK / Bitview 基础日线", method="自行计算（% of supply）",
-        caveat="只保留低估期，不显示牛市派发；深卖阈值=过去周期低估期线 5/10% 分位（无前视）。",
+        caveat="只保留低估期，不显示牛市派发；数据过期时只展示，不参与阶段判断。",
         thresholds=[
-            {"label": "深卖阈值·10%分位（无前视）", "meaning": "低估期卖出强度进入过去周期 10% 分位。"},
-            {"label": "深卖阈值·5%分位（无前视）", "meaning": "低估期卖出强度进入更深 5% 分位。"},
-            {"label": "积累/卖出分界", "meaning": "零线：长期供应由净卖出转为净积累。"},
+            {"label": "深度压力区", "meaning": "低估期 HODLer NPC 低于零，长期不动供应转为净卖出。"},
         ],
     ),
     IndicatorDisplay(
@@ -189,7 +186,7 @@ INDICATORS: list[IndicatorDisplay] = [
         source="Open Bitcoin Metrics v0.1.0", method="≥155d 年龄分层",
         caveat="公开数据不能逐笔判断老币是否亏损卖出；MVRV<1 仅代表全网整体亏损。仅作低估期投降确认，不作独立触发。",
         thresholds=[
-            {"label": "过去低估期90%分位（无前视）", "meaning": "老币花费占比进入过去低估期 90% 分位。"},
+            {"label": "90%分位观察区", "meaning": "低估期老币花费价值占比高于 3%。"},
         ],
     ),
     IndicatorDisplay(
@@ -197,9 +194,9 @@ INDICATORS: list[IndicatorDisplay] = [
         description="结合波动与供应行为，观察卖方压力是否接近耗竭。",
         formula="PSIP × BRK 30d Price Volatility",
         source="BRK / Bitview 基础日线", method="自行计算",
-        caveat="用于辅助解释，不能代替核心持有者证据；阈值=过去周期 10% 分位（无前视）。",
+        caveat="用于辅助解释，不能代替核心持有者证据。",
         thresholds=[
-            {"label": "过去周期10%分位（无前视）", "meaning": "卖方压力接近过去周期 10% 分位的耗竭区。"},
+            {"label": "10%分位观察区", "meaning": "Seller Exhaustion Constant 低于 0.05。"},
         ],
     ),
     IndicatorDisplay(
@@ -209,8 +206,8 @@ INDICATORS: list[IndicatorDisplay] = [
         source="BRK / Bitview", method="公开成品日线；另做日度复算核对",
         caveat="矿工压力是独立核心证据，但不等同于价格最低点；按块计算与按日线复算存在口径差。",
         thresholds=[
-            {"label": "低收入区上界", "meaning": "矿工收入低于一年均值。"},
-            {"label": "历史深压参考", "meaning": "矿工经济压力进一步加深。"},
+            {"label": "观察区", "meaning": "Puell Multiple 低于 0.60，矿工收入压力开始明显。"},
+            {"label": "深度压力区", "meaning": "Puell Multiple 低于 0.50，矿工经济压力进一步加深。"},
         ],
     ),
     IndicatorDisplay(
@@ -220,9 +217,8 @@ INDICATORS: list[IndicatorDisplay] = [
         source="BRK / Bitview", method="log + 滚动四年 z-score（无前视）",
         caveat="归一化方法是相对自身周期的过热/过冷视角；绝对阈值底部 5-7 / 顶部 50-74 仍有效。",
         thresholds=[
-            {"label": "z·过去周期10%分位（先触发）", "meaning": "进入周期归一化的低位区。"},
-            {"label": "z·过去周期5%分位（深部）", "meaning": "进入更深的周期低位区。"},
-            {"label": "自身4年均值（中性）", "meaning": "等于自身滚动四年均值。", "role": "neutral"},
+            {"label": "10%分位定投区", "meaning": "进入周期归一化的 10% 低位区。"},
+            {"label": "5%分位深度压力区", "meaning": "进入周期归一化的 5% 深部区。"},
         ],
     ),
     IndicatorDisplay(
@@ -232,7 +228,7 @@ INDICATORS: list[IndicatorDisplay] = [
         source="BRK / Bitview Price 与 CDD", method="自行计算（Willy Woo 2019 固定常数版）",
         caveat="以相对距离的倒数表达；价格恰好等于 CVDD 时无定义。供应归一化 CVDD 是另一版本，不混用。",
         thresholds=[
-            {"label": "距CVDD 50%", "meaning": "价格距 CVDD 地板约 50%。"},
+            {"label": "极端压力区", "meaning": "CVDD 接近程度高于 5。"},
         ],
     ),
     IndicatorDisplay(
@@ -242,9 +238,8 @@ INDICATORS: list[IndicatorDisplay] = [
         source="BRK / Bitview", method="log + 滚动四年 z-score（无前视）",
         caveat="Reserve Risk 分母为单调累积量，绝对值每轮下移、固定阈值永久失效；切勿套 0.002。",
         thresholds=[
-            {"label": "z·过去周期10%分位（先触发）", "meaning": "长期持有信念进入周期高位。"},
-            {"label": "z·过去周期5%分位（深部）", "meaning": "长期持有信念处于更深的周期高位。"},
-            {"label": "自身4年均值（中性）", "meaning": "等于自身滚动四年均值。", "role": "neutral"},
+            {"label": "10%分位观察区", "meaning": "Reserve Risk 进入周期 10% 低位区。"},
+            {"label": "5%分位深度压力区", "meaning": "Reserve Risk 进入周期 5% 深部区。"},
         ],
     ),
 ]

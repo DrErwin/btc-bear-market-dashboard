@@ -1,0 +1,239 @@
+{
+  "schema": "btc-indicator-validation-config",
+  "exportedAt": "2026-07-28T17:25:39.304Z",
+  "dataset": {
+    "generatedAt": "2026-07-27T15:49:54.118734+00:00",
+    "priceLatest": "2026-07-27",
+    "metricCount": 16
+  },
+  "version": 2,
+  "ui": {
+    "selectedMetricId": "mvrv",
+    "priceScale": "log",
+    "indicatorScale": "linear",
+    "rangePreset": "8",
+    "showPrice": true
+  },
+  "metrics": {
+    "mvrv": {
+      "references": [
+        {
+          "value": 1,
+          "label": "观察区"
+        },
+        {
+          "value": 0.8,
+          "label": "深度压力区"
+        }
+      ],
+      "direction": "below",
+      "verdict": "valid",
+      "lineMode": "all",
+      "analysis": ""
+    },
+    "aviv": {
+      "references": [
+        {
+          "value": 0.55,
+          "label": "深度压力区"
+        }
+      ],
+      "direction": "below",
+      "verdict": "valid",
+      "lineMode": "all",
+      "analysis": "抄底区不一定能到，上个周期就没到"
+    },
+    "sth_mvrv_price": {
+      "references": [
+        {
+          "value": 0,
+          "label": "无参考线"
+        }
+      ],
+      "direction": "below",
+      "verdict": "valid",
+      "lineMode": "all",
+      "analysis": ""
+    },
+    "psip": {
+      "references": [
+        {
+          "value": 0.5,
+          "label": "观察区"
+        },
+        {
+          "value": 0.45,
+          "label": "极端压力区"
+        }
+      ],
+      "direction": "below",
+      "verdict": "valid",
+      "lineMode": "all",
+      "analysis": ""
+    },
+    "sipl": {
+      "references": [
+        {
+          "value": -0.05,
+          "label": "深度压力区"
+        }
+      ],
+      "direction": "below",
+      "verdict": "valid",
+      "lineMode": "all",
+      "analysis": ""
+    },
+    "relative_unrealized_profit": {
+      "references": [
+        {
+          "value": 0.35,
+          "label": "深度压力区"
+        }
+      ],
+      "direction": "below",
+      "verdict": "valid",
+      "lineMode": "all",
+      "analysis": ""
+    },
+    "relative_unrealized_loss_zscore_4y": {
+      "references": [
+        {
+          "value": 2,
+          "label": "观察区"
+        },
+        {
+          "value": 2.5,
+          "label": "深度压力区"
+        }
+      ],
+      "direction": "above",
+      "verdict": "valid",
+      "lineMode": "all",
+      "analysis": ""
+    },
+    "realized_cap_relative_npc_30d": {
+      "references": [
+        {
+          "value": -0.04,
+          "label": "深度压力区"
+        }
+      ],
+      "direction": "below",
+      "verdict": "valid",
+      "lineMode": "all",
+      "analysis": "低于这个值说明相比一个月前经历了大幅回撤，值越低说明回撤幅度越大\n虽然不能完全说是熊底，但也差不多了"
+    },
+    "asopr": {
+      "references": [
+        {
+          "value": 0.9,
+          "label": "深度压力区"
+        },
+        {
+          "value": 0.95,
+          "label": "观察区"
+        }
+      ],
+      "direction": "below",
+      "verdict": "valid",
+      "lineMode": "all",
+      "analysis": ""
+    },
+    "hodler_npc_30d": {
+      "references": [
+        {
+          "value": 0,
+          "label": "深度压力区"
+        }
+      ],
+      "direction": "below",
+      "verdict": "valid",
+      "lineMode": "all",
+      "analysis": "尖峰代表大幅回撤、大范围投降"
+    },
+    "spent_value_ge155d_share": {
+      "references": [
+        {
+          "value": 0.03,
+          "label": "90%分位观察区"
+        }
+      ],
+      "direction": "above",
+      "verdict": "valid",
+      "lineMode": "all",
+      "analysis": "辅助观察熊底特征"
+    },
+    "seller_exhaustion": {
+      "references": [
+        {
+          "value": 0.05,
+          "label": "10%分位观察区"
+        }
+      ],
+      "direction": "below",
+      "verdict": "valid",
+      "lineMode": "all",
+      "analysis": "通常在熊底的时候有局部波峰——恐慌盘\n然后落入局部波谷——没人卖了，市场沉寂\n\n所以它出现在熊底后，说明走出熊底\n主要用在右侧买入"
+    },
+    "puell_multiple": {
+      "references": [
+        {
+          "value": 0.6,
+          "label": "观察区"
+        },
+        {
+          "value": 0.5,
+          "label": "深度压力区"
+        }
+      ],
+      "direction": "below",
+      "verdict": "valid",
+      "lineMode": "all",
+      "analysis": "定投只是部分矿机亏损，实际上熊底会让大部分矿机关机、矿工亏损\n抄底区是比较稳的熊底位置"
+    },
+    "thermocap_multiple_zscore": {
+      "references": [
+        {
+          "value": -0.6147138165,
+          "label": "10%分位定投区"
+        },
+        {
+          "value": -0.8703706199,
+          "label": "5%分位深度压力区"
+        }
+      ],
+      "direction": "below",
+      "verdict": "valid",
+      "lineMode": "all",
+      "analysis": ""
+    },
+    "cvdd_proximity": {
+      "references": [
+        {
+          "value": 5,
+          "label": "极端压力区"
+        }
+      ],
+      "direction": "above",
+      "verdict": "valid",
+      "lineMode": "all",
+      "analysis": ""
+    },
+    "reserve_risk_zscore": {
+      "references": [
+        {
+          "value": -1.320779819,
+          "label": "10%分位观察区"
+        },
+        {
+          "value": -1.892782115,
+          "label": "5%分位深度压力区"
+        }
+      ],
+      "direction": "below",
+      "verdict": "valid",
+      "lineMode": "all",
+      "analysis": "只能说明价格的回报性价比\n18年熊底没触发，反而是走出熊底的大回调触发了"
+    }
+  }
+}

@@ -23,12 +23,30 @@ DATA_INSUFFICIENT = "数据不足"
 _CORE_METRICS = ("mvrv", "puell_multiple")
 
 
-def _state(value: float, *, watch: float, deep: float) -> str:
-    if value < deep:
-        return "deep"
-    if value < watch:
-        return "watch"
-    return "none"
+def _state_from_thresholds(metric: Mapping[str, Any]) -> str:
+    """Classify a metric from the same thresholds exposed in its snapshot."""
+    value = metric.get("current_value")
+    if not isinstance(value, (int, float)) or isinstance(value, bool):
+        return "missing"
+    state = "none"
+    for threshold in metric.get("thresholds", []):
+        if not isinstance(threshold, Mapping) or threshold.get("role", "trigger") == "neutral":
+            continue
+        target = threshold.get("value")
+        direction = threshold.get("direction")
+        if not isinstance(target, (int, float)) or isinstance(target, bool):
+            continue
+        crossed = (
+            (direction == "below" and value < target)
+            or (direction == "above" and value > target)
+        )
+        if not crossed:
+            continue
+        label = str(threshold.get("label") or "")
+        if "深度" in label or "深部" in label or "极端" in label:
+            return "deep"
+        state = "watch"
+    return state
 
 
 def _state_label(state: str) -> str:
@@ -87,8 +105,6 @@ def _core_dimension(
     metric: Mapping[str, Any] | None,
     *,
     dimension: str,
-    watch: float,
-    deep: float,
 ) -> dict[str, Any]:
     if not metric or metric.get("status") != CURRENT or not isinstance(metric.get("current_value"), (int, float)):
         return {
@@ -100,7 +116,7 @@ def _core_dimension(
             "current_value": metric.get("current_value") if metric else None,
             "judgment_eligible": False,
         }
-    state = _state(float(metric["current_value"]), watch=watch, deep=deep)
+    state = _state_from_thresholds(metric)
     return {
         "dimension": dimension,
         "state": state,
@@ -223,16 +239,12 @@ def compile_evidence(
         max_stale_days=max_stale_days,
     )
     metric_index = _metric_index(snapshot, quality)
-    valuation = _core_dimension(
-        metric_index.get("mvrv"), dimension="valuation", watch=1.0, deep=0.8
-    )
-    miners = _core_dimension(
-        metric_index.get("puell_multiple"), dimension="miners", watch=1.0, deep=0.5
-    )
+    valuation = _core_dimension(metric_index.get("mvrv"), dimension="valuation")
+    miners = _core_dimension(metric_index.get("puell_multiple"), dimension="miners")
     aviv_metric = metric_index.get("aviv")
     aviv_state = "missing"
     if aviv_metric and aviv_metric.get("status") == CURRENT and isinstance(aviv_metric.get("current_value"), (int, float)):
-        aviv_state = _state(float(aviv_metric["current_value"]), watch=0.65, deep=0.55)
+        aviv_state = _state_from_thresholds(aviv_metric)
 
     allowed = _allowed_stages(valuation["state"], miners["state"], aviv_state)
     themes = _theme_items(metric_index)

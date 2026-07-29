@@ -10,14 +10,15 @@ from pathlib import Path
 
 import pytest
 
+from services.data import derive
 from services.data.packet import PacketValidationError, validate_packet
 
 
 ROOT = Path(__file__).resolve().parents[2]
 PACKET_PATH = ROOT / "dashboard" / "public" / "data" / "packet.json"
 TIMELINE_PATH = ROOT / "prototype-indicator-timeline" / "timeline-data.json"
-CONFIG_PATH = Path(r"C:\Users\57652\Downloads\btc-indicator-config-2026-07-28.json")
-CONFIG_SHA256 = "CAD0028AF77A30065A42D0C47181DEB8256434DC2410C4B2128391D4477EBC98"
+CONFIG_PATH = ROOT / "specs" / "v0.2.4" / "btc-indicator-config-2026-07-28.json"
+CONFIG_SHA256 = "435BB97DF65A69F1C50E084AB3C18A048D2AED57699B1E2945BDC1B72C2AFF81"
 TIMELINE_SHA256 = "15C6FF03ABDD0663F9357BC8675D670C637C4F15574236915CBC5B48D6FA163A"
 CHART_OPTION_PATH = ROOT / "dashboard" / "src" / "composables" / "useChartOption.ts"
 
@@ -63,13 +64,18 @@ def test_packet_reproduces_exported_reference_lines_and_all_timeline_lines() -> 
         snapshot = snapshot_by_id[display_id]
         exported = config["metrics"][source_id]
         scale = 100 if snapshot["unit"] == "%" else 1
+        published_references = [
+            reference
+            for reference in exported["references"]
+            if reference.get("label") != "无参考线"
+        ]
 
         assert [(item["value"], item["label"]) for item in entry["thresholds"]] == [
             (reference["value"] * scale, reference["label"])
-            for reference in exported["references"]
+            for reference in published_references
         ]
         assert [item["direction"] for item in entry["thresholds"]] == [
-            exported["direction"] for _ in exported["references"]
+            exported["direction"] for _ in published_references
         ]
 
         expected_lines = timeline_by_id[source_id]["lines"]
@@ -101,6 +107,10 @@ def test_packet_reproduces_exported_reference_lines_and_all_timeline_lines() -> 
             for actual_point, expected_point in zip(
                 actual_baseline, expected_points
             ):
+                if display_id == "sth-mvrv" and actual["id"] != "primary":
+                    # The three STH-RP tactical ladders are rebuilt across the
+                    # full history whenever their live daily ratios change.
+                    continue
                 if date.fromisoformat(actual_point["date"]) <= stable_cutoff:
                     assert actual_point["value"] == pytest.approx(
                         expected_point["value"], rel=1e-9, abs=1e-9
@@ -125,6 +135,45 @@ def test_packet_rejects_malformed_line_axis_or_duplicate_id() -> None:
     duplicate["series"]["metrics"]["sipl"]["lines"][1]["id"] = "primary"
     with pytest.raises(PacketValidationError):
         validate_packet(duplicate)
+
+
+def test_status_thresholds_match_chart_thresholds_except_dynamic_sth() -> None:
+    packet = json.loads(PACKET_PATH.read_text(encoding="utf-8"))
+    snapshot_by_id = {metric["id"]: metric for metric in packet["snapshot"]["metrics"]}
+
+    for display_id in DISPLAY_TO_SOURCE:
+        snapshot_thresholds = snapshot_by_id[display_id]["thresholds"]
+        chart_thresholds = packet["series"]["metrics"][display_id]["thresholds"]
+        if display_id == "sth-mvrv":
+            assert chart_thresholds == []
+            assert [item["label"] for item in snapshot_thresholds] == [
+                "观察区",
+                "深度压力区",
+                "极端压力区",
+            ]
+            assert all(isinstance(item["value"], (int, float)) for item in snapshot_thresholds)
+            continue
+        assert [
+            (item["value"], item["direction"], item["label"])
+            for item in snapshot_thresholds
+        ] == [
+            (item["value"], item["direction"], item["label"])
+            for item in chart_thresholds
+        ]
+
+
+def test_sth_status_statistics_recalculate_when_latest_history_changes() -> None:
+    start = date(2018, 1, 1)
+    history = {
+        start + timedelta(days=index): 1.0 + index / 100
+        for index in range(40)
+    }
+    before_q5 = derive.live_anchored_quantile(history, 0.05)
+    before_stats = derive.live_anchored_stats(history)
+    history[start + timedelta(days=40)] = 0.1
+
+    assert derive.live_anchored_quantile(history, 0.05) != before_q5
+    assert derive.live_anchored_stats(history)["mean"] != before_stats["mean"]
 
 
 def test_reserve_risk_display_label_is_period_only_in_every_fixture() -> None:

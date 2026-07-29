@@ -112,7 +112,7 @@ def test_rc_npc_threshold_meaning_matches_its_configured_direction() -> None:
     rc_npc = BY_CANONICAL["realized_cap_relative_npc_30d"]
 
     assert rc_npc.thresholds[0]["meaning"] == (
-        "三十日已实现资本变化由收缩转为扩张。"
+        "三十日已实现资本相对变化低于 -4%。"
     )
 
 

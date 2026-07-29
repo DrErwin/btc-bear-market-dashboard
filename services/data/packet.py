@@ -69,13 +69,8 @@ def _compute_tier(
     display_thresholds: list[dict],
     current_raw: float,
 ) -> tuple[str, str]:
-    """Tier = how many *trigger* thresholds the current value has crossed.
-
-    Thresholds whose display entry carries ``role == "neutral"`` (e.g. the
-    self-4y-mean line on z-score metrics) are reference lines, not evidence
-    depth, so they never count toward the tier.
-    """
-    triggered = 0
+    """Return the deepest named status threshold crossed by the current value."""
+    triggered: list[tuple[int, int, dict]] = []
     for raw_value, display in zip(references_raw, display_thresholds):
         if display.get("role") == "neutral":
             continue
@@ -84,12 +79,21 @@ def _compute_tier(
         else:
             crossed = current_raw > raw_value
         if crossed:
-            triggered += 1
-    if triggered == 0:
+            label = str(display.get("label") or "观察区")
+            if "极端" in label:
+                severity = 3
+            elif "深度" in label or "深部" in label:
+                severity = 2
+            else:
+                severity = 1
+            triggered.append((severity, len(triggered), display))
+    if not triggered:
         return ("未进入观察区", "当前值未触及该指标的任何观察阈值。")
-    if triggered == 1:
-        return ("进入观察区", "当前值已触及该指标的第一档观察阈值。")
-    return ("重点观察区", f"当前值已触及 {triggered} 档阈值，构成更强的该维度证据。")
+    _, _, deepest = max(triggered, key=lambda item: (item[0], item[1]))
+    return (
+        str(deepest.get("label") or "观察区"),
+        str(deepest.get("meaning") or "当前值已触及该指标的观察阈值。"),
+    )
 
 
 # ---------------------------------------------------------------------------

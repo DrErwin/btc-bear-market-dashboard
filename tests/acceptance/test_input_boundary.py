@@ -93,12 +93,13 @@ def test_input_builder_excludes_neutral_chart_reference_lines() -> None:
     thermocap = next(
         metric for metric in snapshot["metrics"] if metric["id"] == "thermo"
     )
-    neutral = next(
-        threshold
-        for threshold in thermocap["thresholds"]
-        if threshold["label"] == "自身4年均值（中性）"
-    )
-    neutral["role"] = "neutral"
+    thermocap["thresholds"].append({
+        "value": 0.0,
+        "direction": "below",
+        "label": "自身4年均值（中性）",
+        "meaning": "仅用于读图，不参与状态判断。",
+        "role": "neutral",
+    })
 
     request = build_ai_input(snapshot)
     ai_thermocap = next(
