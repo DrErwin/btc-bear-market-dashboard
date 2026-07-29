@@ -13,7 +13,7 @@
 | `v0.3.0` | 历史版本（已被 v0.4.0 取代） | [体系设计](v0.3.0/indicator-evidence-system-design.md) · [工作计划](v0.3.0/indicator-evidence-system-work-plan.md) · [验收记录](v0.3.0/acceptance-record.md) | 建立指标角色、数据质量闸门和证据编译思路；其中单一 `allowed_stages` 阶段契约仅保留作历史记录。 |
 | `v0.3.1` | 历史本地基线（已被 v0.4.0 取代） | [需求](v0.3.1/requirements.md) · [实现记录](v0.3.1/implementation-record.md) | 统一状态阈值与图表阈值；阈值数值、方向、顺序和人工三档含义由 v0.4.0 继续保留。 |
 | `v0.4.0` | 本地已实现并验收，未部署 | [实施规格](v0.4.0/implementation-spec.md) · [实现记录](v0.4.0/implementation-record.md) · [验收记录](v0.4.0/acceptance-record.md) · [历史窗口验证](v0.4.0/lookback-validation.json) · [状态模型设计](v0.4.0/market-state-model-design.md) | 双轴市场状态（压力轴 + 筑底轴）、稳定档位身份、指标职责与相关性家族、有限时间线、前三个自然日上下文、六段详细解释和完整结果包。 |
-| `v0.4.1` | 计划中 | [需求](v0.4.1/requirements.md) · [完成情况](v0.4.1/completion.md) | 用户指标判断进入 AI Prompt、普通人可理解的指标含义、指标解释栏悬浮展开公式/含义/用法。 |
+| `v0.4.1` | 计划中 | [需求](v0.4.1/requirements.md) · [完成情况](v0.4.1/completion.md) | 用户指标判断进入 AI Prompt、普通人可理解的指标含义、指标解释栏悬浮展开公式/含义/用法、删除 SIPL 指标。 |
 
 ## 版本规则
 
