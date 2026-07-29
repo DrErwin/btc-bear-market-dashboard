@@ -1,7 +1,7 @@
-"""Stable v0.3.0 indicator roles, eligibility, and evidence themes.
+"""Stable v0.4 indicator roles, eligibility, and evidence families.
 
 The dashboard has one visible catalogue of sixteen indicators, but a visible
-card is not automatically a vote in the current-stage decision.  This module
+card is not automatically a vote in either market-state axis.  This module
 is the small, dependency-free registry shared by the data-quality gate,
 evidence compiler, AI input builder, and frontend adapters.
 
@@ -251,12 +251,38 @@ THEME_REGISTRY: Final[dict[str, dict[str, object]]] = {
 }
 
 
+# v0.4 facts for the AI boundary.  They describe what a metric is useful for;
+# they do not tell the model which axis state to select.  One metric has one
+# primary responsibility and one correlation family, so related cards cannot
+# silently become several independent votes.
+_RESPONSIBILITY_BY_ID: Final[dict[str, dict[str, object]]] = {
+    "mvrv": {"primary_responsibility": "pressure_anchor", "axis_relevance": ("pressure", "bottoming"), "correlation_family": "valuation"},
+    "aviv": {"primary_responsibility": "pressure_confirmation", "axis_relevance": ("pressure", "bottoming"), "correlation_family": "valuation"},
+    "sth_mvrv_price": {"primary_responsibility": "repair_signal", "axis_relevance": ("bottoming",), "correlation_family": "short_term_cost"},
+    "psip": {"primary_responsibility": "pressure_context", "axis_relevance": ("pressure", "bottoming"), "correlation_family": "supply_loss"},
+    "sipl": {"primary_responsibility": "pressure_context", "axis_relevance": ("pressure",), "correlation_family": "supply_loss"},
+    "relative_unrealized_profit": {"primary_responsibility": "pressure_context", "axis_relevance": ("pressure", "bottoming"), "correlation_family": "supply_loss"},
+    "relative_unrealized_loss_zscore_4y": {"primary_responsibility": "pressure_severity", "axis_relevance": ("pressure", "bottoming"), "correlation_family": "supply_loss"},
+    "realized_cap_relative_npc_30d": {"primary_responsibility": "repair_signal", "axis_relevance": ("bottoming",), "correlation_family": "realized_capital"},
+    "asopr": {"primary_responsibility": "capitulation_clue", "axis_relevance": ("pressure", "bottoming"), "correlation_family": "realized_loss"},
+    "hodler_npc_30d": {"primary_responsibility": "capitulation_context", "axis_relevance": ("bottoming",), "correlation_family": "holder_behavior"},
+    "spent_value_ge155d_share": {"primary_responsibility": "capitulation_context", "axis_relevance": ("bottoming",), "correlation_family": "holder_behavior"},
+    "seller_exhaustion": {"primary_responsibility": "exhaustion_clue", "axis_relevance": ("bottoming",), "correlation_family": "seller_exhaustion"},
+    "puell_multiple": {"primary_responsibility": "pressure_anchor", "axis_relevance": ("pressure", "bottoming"), "correlation_family": "miner_pressure"},
+    "thermocap_multiple_zscore": {"primary_responsibility": "pressure_context", "axis_relevance": ("pressure",), "correlation_family": "miner_pressure"},
+    "cvdd_proximity": {"primary_responsibility": "bottoming_context", "axis_relevance": ("bottoming",), "correlation_family": "long_term_anchor"},
+    "reserve_risk_zscore": {"primary_responsibility": "bottoming_context", "axis_relevance": ("bottoming",), "correlation_family": "long_term_anchor"},
+}
+
+
 def _entry(definition: dict[str, object]) -> dict[str, object]:
     role = str(definition["role"])
     status = str(definition["judgment_status"])
     theme_id = str(definition["theme_id"])
+    responsibility = _RESPONSIBILITY_BY_ID.get(str(definition["canonical_id"]), {})
     return {
         **definition,
+        **responsibility,
         "role_label": ROLE_LABELS[role],
         "status_label": JUDGMENT_STATUS_LABELS[status],
         # Both spellings are retained to keep downstream adapters explicit.
@@ -307,6 +333,16 @@ def theme_for(metric_id: str) -> str:
     return str(INDICATOR_ROLE_REGISTRY[canonical_id]["theme_id"])
 
 
+def responsibility_for(metric_id: str) -> str:
+    canonical_id = canonical_id_for_snapshot_id(metric_id)
+    return str(INDICATOR_ROLE_REGISTRY[canonical_id]["primary_responsibility"])
+
+
+def correlation_family_for(metric_id: str) -> str:
+    canonical_id = canonical_id_for_snapshot_id(metric_id)
+    return str(INDICATOR_ROLE_REGISTRY[canonical_id]["correlation_family"])
+
+
 CANONICAL_INDICATOR_IDS: Final[tuple[str, ...]] = tuple(_CANONICAL_ENTRIES)
 DISPLAY_INDICATOR_IDS: Final[tuple[str, ...]] = tuple(
     str(item["display_id"]) for item in _INDICATOR_DEFINITIONS
@@ -325,4 +361,6 @@ __all__ = [
     "canonical_id_for_snapshot_id",
     "role_for",
     "theme_for",
+    "responsibility_for",
+    "correlation_family_for",
 ]

@@ -2,7 +2,7 @@
 import { computed, onMounted, ref } from "vue";
 import AppHeader from "./components/AppHeader.vue";
 import AiEvaluation from "./components/AiEvaluation.vue";
-import StageAxis from "./components/StageAxis.vue";
+import DualAxisSummary from "./components/DualAxisSummary.vue";
 import CategoryGrid from "./components/CategoryGrid.vue";
 import MetricList from "./components/MetricList.vue";
 import SharedChart from "./components/SharedChart.vue";
@@ -42,18 +42,15 @@ const detailSections = computed(() => {
   const detailed = current.detailed ?? {};
   const quality = data.value?.evidenceBrief?.data_quality;
   const qualityText = quality
-    ? `关键数据状态：${quality.stage_ready ? "关键锚可用" : "关键锚不可用"}。排除指标：${Array.isArray(quality.critical_missing) && quality.critical_missing.length ? quality.critical_missing.join("、") : "无"}。`
+    ? `数据状态：${data.value?.status.data_insufficient ? "部分轴暂时不足" : "两条轴均有可用输入"}。缺口由指标卡和时间线继续说明。`
     : undefined;
   const sections = [
-    { id: "core", label: "核心依据", text: detailed.core_evidence ?? detailed.supporting ?? detailed.core },
-    { id: "pressure", label: "压力补充", text: detailed.pressure ?? current.pressure_summary },
-    { id: "contrary", label: "相反证据", text: detailed.contrary },
-    { id: "next", label: "下一阶段条件", text: detailed.next_stage },
-    {
-      id: "limits",
-      label: "数据限制",
-      text: detailed.data_limit ?? detailed.data_limits ?? detailed.data_quality ?? detailed.limitations ?? qualityText,
-    },
+    { id: "pressure_reason", label: "压力判断", text: detailed.pressure_reason },
+    { id: "bottoming_reason", label: "筑底判断", text: detailed.bottoming_reason },
+    { id: "evidence_timeline", label: "证据时间线", text: detailed.evidence_timeline },
+    { id: "contrary_or_gaps", label: "相反证据与缺口", text: detailed.contrary_or_gaps ?? qualityText },
+    { id: "repair_exit", label: "修复与离开窗口", text: detailed.repair_exit },
+    { id: "next_evidence", label: "下一步观察重点", text: detailed.next_evidence },
   ];
   return sections.filter((section): section is { id: string; label: string; text: string } => Boolean(section.text?.trim()));
 });
@@ -108,7 +105,10 @@ function closeMethod(event: MouseEvent) {
             :details-open="detailsOpen"
             @toggle-details="detailsOpen = !detailsOpen"
           />
-          <StageAxis :current-stage="analysis?.stage ?? null" />
+          <DualAxisSummary
+            :pressure-state="analysis?.pressure_state ?? null"
+            :bottoming-state="analysis?.bottoming_state ?? null"
+          />
 
           <section v-if="analysis && detailsOpen && detailSections.length" class="detail-drawer" aria-label="详细分析">
             <article v-for="section in detailSections" :key="section.id">
@@ -191,8 +191,8 @@ function closeMethod(event: MouseEvent) {
         <button class="dialog-close" type="button" aria-label="关闭方法说明" @click="methodOpen = false">×</button>
         <span class="eyebrow">方法边界</span>
         <h2 id="method-title">把复杂指标变成可检查的证据结构</h2>
-        <p>看板每天使用一份固定的指标快照，先分别读取六类证据状态，再归纳为一个市场阶段。当前值、阈值语义和来源限制始终留在指标区域，方便你自己复核。</p>
-        <p>图表仅用于检查指标和 BTC 价格的共同时间范围；它与每日阶段分析分开，刷新页面不会重新生成结论。</p>
+        <p>看板每天使用一份固定的指标快照，分别读取压力深度和筑底过程两条轴。当前值、阈值语义和来源限制始终留在指标区域，方便你自己复核。</p>
+        <p>图表仅用于检查指标和 BTC 价格的共同时间范围；它与每日双轴分析分开，刷新页面不会重新生成结论。</p>
         <button class="primary-button" type="button" @click="methodOpen = false">返回看板</button>
       </section>
     </div>

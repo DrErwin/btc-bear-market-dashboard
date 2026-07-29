@@ -1,20 +1,35 @@
-"""The fixed vocabulary and public shape of a daily AI analysis."""
+"""The v0.4 dual-axis AI contract.
+
+The machine sends facts and fixed vocabularies.  The model chooses one state
+on each axis and explains the choice.  There is deliberately no combined
+stage, score, or machine-generated ``allowed_stages`` range in this contract.
+"""
 
 from __future__ import annotations
 
 from typing import Final
 
 
-MARKET_STAGES: Final[tuple[str, ...]] = (
-    "尚未进入熊底观察期",
-    "熊市下行期",
-    "深度压力期",
-    "筑底证据积累期",
-    "熊底证据充分期",
+PRESSURE_STATES: Final[tuple[str, ...]] = (
+    "压力尚未明显",
+    "进入观察",
+    "深度压力",
+    "极端压力",
+    "数据不足",
 )
-DATA_INSUFFICIENT_STAGE: Final[str] = "数据不足"
-ALLOWED_STAGES: Final[tuple[str, ...]] = MARKET_STAGES + (DATA_INSUFFICIENT_STAGE,)
 
+BOTTOMING_STATES: Final[tuple[str, ...]] = (
+    "未见筑底结构",
+    "筑底线索出现",
+    "筑底证据聚合",
+    "筑底证据较完整",
+    "市场修复中",
+    "已离开底部窗口",
+    "数据不足",
+)
+
+AXIS_IDS: Final[tuple[str, ...]] = ("pressure", "bottoming")
+CONSISTENCY_VALUES: Final[tuple[str, ...]] = ("弱", "中等", "强")
 CATEGORY_IDS: Final[tuple[str, ...]] = (
     "valuation",
     "supply",
@@ -24,91 +39,95 @@ CATEGORY_IDS: Final[tuple[str, ...]] = (
     "anchors",
 )
 CATEGORY_STATUS_VALUES: Final[tuple[str, ...]] = ("未确认", "部分确认", "充分确认")
-CONSISTENCY_VALUES: Final[tuple[str, ...]] = ("弱", "中等", "强")
+DETAIL_SECTION_IDS: Final[tuple[str, ...]] = (
+    "pressure_reason",
+    "bottoming_reason",
+    "evidence_timeline",
+    "contrary_or_gaps",
+    "repair_exit",
+    "next_evidence",
+)
 
-STAGE_DEFINITIONS: Final[dict[str, str]] = {
-    "尚未进入熊底观察期": "当前快照还没有进入项目定义的熊底证据观察范围。",
-    "熊市下行期": "当前快照显示下行压力，但熊底证据仍未充分聚合。",
-    "深度压力期": "多个压力类别已经明显，但仍需要更多独立类别确认。",
-    "筑底证据积累期": "部分核心类别已经确认，证据正在向更完整的底部结构收敛。",
-    "熊底证据充分期": "核心类别与支持证据形成较完整的一致性组合。",
-    "数据不足": "当前输入不足以做出可靠的市场阶段判断。",
-}
-
-CATEGORY_STATUS_DEFINITIONS: Final[dict[str, str]] = {
-    "未确认": "该类别当前没有达到可确认的证据条件。",
-    "部分确认": "该类别出现方向性证据，但仍缺少完整确认。",
-    "充分确认": "该类别的当前快照满足项目设定的充分确认条件。",
+STATE_DEFINITIONS: Final[dict[str, dict[str, str]]] = {
+    "pressure": {
+        "压力尚未明显": "当前可用事实还没有形成明显的广泛压力。",
+        "进入观察": "已经出现需要持续观察的压力现象，但深度尚未广泛聚合。",
+        "深度压力": "多个相互独立的市场压力维度已经明显加深。",
+        "极端压力": "多个独立维度同时处在历史校准的极端压力附近。",
+        "数据不足": "当前数据覆盖、新鲜度或时间线不足以判断压力深度。",
+    },
+    "bottoming": {
+        "未见筑底结构": "当前没有足够的筑底、耗竭或承接结构事实。",
+        "筑底线索出现": "已经出现少量筑底相关线索，但结构仍不完整。",
+        "筑底证据聚合": "来自不同职责的筑底线索正在陆续聚合。",
+        "筑底证据较完整": "压力、耗竭、承接和时间线共同形成较完整结构。",
+        "市场修复中": "底部窗口内的修复和承接事实持续出现。",
+        "已离开底部窗口": "修复持续且主要底部压力事实已明显离开底部窗口。",
+        "数据不足": "当前数据覆盖、新鲜度或时间线不足以判断筑底过程。",
+    },
 }
 
 CONSISTENCY_DEFINITIONS: Final[dict[str, str]] = {
-    "弱": "不同类别之间的证据方向不够一致。",
-    "中等": "部分类别方向一致，但仍有重要未确认或反面证据。",
-    "强": "多个独立类别的证据方向较为一致。",
+    "弱": "证据方向分散，支持、反面和缺失事实之间仍有明显空白。",
+    "中等": "部分独立维度方向一致，但仍有重要反面或缺失事实。",
+    "强": "多个独立维度和时间线方向较为一致，反面证据有限。",
+}
+
+# Kept as import-only aliases for old scripts.  v0.4 never serialises these
+# names and no runtime decision is allowed to depend on them.
+MARKET_STAGES: Final[tuple[str, ...]] = ()
+ALLOWED_STAGES: Final[tuple[str, ...]] = ()
+DATA_INSUFFICIENT_STAGE: Final[str] = "数据不足"
+STAGE_DEFINITIONS: Final[dict[str, str]] = {}
+CATEGORY_STATUS_DEFINITIONS: Final[dict[str, str]] = {
+    "未确认": "当前没有达到可确认的证据条件。",
+    "部分确认": "出现方向性证据，但仍缺少完整确认。",
+    "充分确认": "当前类别的事实较为完整。",
 }
 
 
 def _text_schema() -> dict[str, object]:
-    return {
-        "oneOf": [
-            {"type": "string", "minLength": 1},
-            {
-                "type": "object",
-                "required": ["text"],
-                "properties": {
-                    "title": {"type": "string", "minLength": 1},
-                    "text": {"type": "string", "minLength": 1},
-                },
-                "additionalProperties": False,
-            },
-        ]
-    }
+    return {"type": "string", "minLength": 1}
 
 
-# This schema is exported for callers that use jsonschema. The validator below
-# deliberately uses only the Python standard library so offline acceptance does
-# not depend on an optional package.
 ANALYSIS_SCHEMA: Final[dict[str, object]] = {
     "$schema": "https://json-schema.org/draft/2020-12/schema",
     "type": "object",
     "required": [
-        "stage",
+        "analysis_date",
+        "pressure_state",
+        "bottoming_state",
         "summary",
-        "core_support",
-        "main_obstacle",
-        "next_stage_condition",
-        "categories",
-        "supporting_evidence",
-        "contrary_evidence",
-        "next_stage_confirmation",
+        "compact",
+        "detailed",
     ],
     "properties": {
-        "analysis_date": {"type": "string", "minLength": 1},
-        "stage": {"enum": list(ALLOWED_STAGES)},
+        "analysis_date": _text_schema(),
+        "pressure_state": {"enum": list(PRESSURE_STATES)},
+        "bottoming_state": {"enum": list(BOTTOMING_STATES)},
         "consistency": {"enum": list(CONSISTENCY_VALUES)},
-        "summary": {"type": "string", "minLength": 1},
-        "core_support": _text_schema(),
-        "main_obstacle": _text_schema(),
-        "next_stage_condition": _text_schema(),
-        "categories": {
-            "type": "array",
-            "minItems": len(CATEGORY_IDS),
-            "maxItems": len(CATEGORY_IDS),
-            "items": {
-                "type": "object",
-                "required": ["category", "status"],
-                "properties": {
-                    "category": {"enum": list(CATEGORY_IDS)},
-                    "status": {"enum": list(CATEGORY_STATUS_VALUES)},
-                },
-                "additionalProperties": False,
-            },
-        },
-        "supporting_evidence": {"type": "string", "minLength": 1},
-        "contrary_evidence": {"type": "string", "minLength": 1},
-        "next_stage_confirmation": {"type": "string", "minLength": 1},
-        "pressure_summary": {"type": "string", "minLength": 1},
+        "summary": _text_schema(),
+        "compact": {"type": "object"},
+        "detailed": {"type": "object"},
     },
     "additionalProperties": False,
 }
-OUTPUT_SCHEMA: Final[dict[str, object]] = ANALYSIS_SCHEMA
+
+
+__all__ = [
+    "PRESSURE_STATES",
+    "BOTTOMING_STATES",
+    "AXIS_IDS",
+    "CONSISTENCY_VALUES",
+    "CATEGORY_IDS",
+    "CATEGORY_STATUS_VALUES",
+    "DETAIL_SECTION_IDS",
+    "STATE_DEFINITIONS",
+    "CONSISTENCY_DEFINITIONS",
+    "ANALYSIS_SCHEMA",
+    "MARKET_STAGES",
+    "ALLOWED_STAGES",
+    "DATA_INSUFFICIENT_STAGE",
+    "STAGE_DEFINITIONS",
+    "CATEGORY_STATUS_DEFINITIONS",
+]

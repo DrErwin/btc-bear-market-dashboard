@@ -2,7 +2,7 @@
 
 > 建议标签：`ready-for-agent`
 >
-> 状态：产品设计与主要验收接缝已确认；已发布为 [GitHub Issue #2](https://github.com/DrErwin/btc-bear-market-dashboard/issues/2) 并添加 `ready-for-agent` 标签。本文用于指导实施，不代表运行代码已经升级。
+> 状态：产品设计与主要验收接缝已确认；已发布为 [GitHub Issue #2](https://github.com/DrErwin/btc-bear-market-dashboard/issues/2) 并添加 `ready-for-agent` 标签。本文已指导本地 v0.4.0 实施并通过统一自动验收；真实模型认证、线上部署和数据授权变更仍需单独批准。
 
 ## Problem Statement
 

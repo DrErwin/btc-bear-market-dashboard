@@ -25,8 +25,9 @@ from . import packet_display
 from .chart_references import references_for
 from .derive import BOTTOMS
 from .metrics import INDICATOR_CATALOG, ComputedData, IndicatorSpec
-from services.evidence.catalog import INDICATOR_ROLE_REGISTRY, ROLE_LABELS
+from services.evidence.catalog import INDICATOR_ROLE_REGISTRY
 from services.evidence.compiler import compile_evidence
+from services.evidence.context import is_v04_analysis
 
 
 # canonical metric id -> category id (fixed dashboard taxonomy).
@@ -35,8 +36,8 @@ _CATEGORY_BY_CANONICAL: dict[str, str] = {
 }
 
 
-SCHEMA_VERSION = "0.3.0"
-CONFIG_VERSION = "0.3.0"
+SCHEMA_VERSION = "0.4.0"
+CONFIG_VERSION = "0.4.0"
 METRIC_COUNT = 16
 CATEGORY_COUNT = 6
 
@@ -68,9 +69,10 @@ def _compute_tier(
     references_raw: list[float],
     display_thresholds: list[dict],
     current_raw: float,
-) -> tuple[str, str]:
+) -> tuple[str, str, str]:
     """Return the deepest named status threshold crossed by the current value."""
     triggered: list[tuple[int, int, dict]] = []
+    tier_rank = {"none": 0, "observation": 1, "deep_pressure": 2, "extreme_pressure": 3}
     for raw_value, display in zip(references_raw, display_thresholds):
         if display.get("role") == "neutral":
             continue
@@ -79,20 +81,18 @@ def _compute_tier(
         else:
             crossed = current_raw > raw_value
         if crossed:
-            label = str(display.get("label") or "观察区")
-            if "极端" in label:
-                severity = 3
-            elif "深度" in label or "深部" in label:
-                severity = 2
-            else:
-                severity = 1
+            tier_id = str(display.get("tier_id") or "none")
+            severity = tier_rank.get(tier_id, 0)
+            if severity == 0:
+                continue
             triggered.append((severity, len(triggered), display))
     if not triggered:
-        return ("未进入观察区", "当前值未触及该指标的任何观察阈值。")
+        return ("未进入观察区", "当前值未触及该指标的任何观察阈值。", "none")
     _, _, deepest = max(triggered, key=lambda item: (item[0], item[1]))
     return (
         str(deepest.get("label") or "观察区"),
         str(deepest.get("meaning") or "当前值已触及该指标的观察阈值。"),
+        str(deepest.get("tier_id") or "observation"),
     )
 
 
@@ -116,7 +116,7 @@ def _build_metric(ind: IndicatorSpec) -> dict:
     latest_day = max(ind.primary)
     current_raw = ind.primary[latest_day]
     references_raw = [ref["value"] for ref in ind.references]
-    tier_label, tier_meaning = _compute_tier(ind.direction, references_raw, display.thresholds, current_raw)
+    tier_label, tier_meaning, tier_id = _compute_tier(ind.direction, references_raw, display.thresholds, current_raw)
 
     thresholds = []
     for ref, display_thr in zip(ind.references, display.thresholds):
@@ -125,6 +125,7 @@ def _build_metric(ind: IndicatorSpec) -> dict:
             "direction": ind.direction,
             "label": display_thr["label"],
             "meaning": display_thr["meaning"],
+            "tier_id": display_thr.get("tier_id", "observation"),
             "role": display_thr.get("role", "trigger"),
         })
 
@@ -142,6 +143,7 @@ def _build_metric(ind: IndicatorSpec) -> dict:
         "current_value": current_raw * scale,
         "display_value": _format_value(current_raw * scale, display.unit_kind),
         "current_date": latest_day.isoformat(),
+        "tier_id": tier_id,
         "tier_label": tier_label,
         "tier_meaning": tier_meaning,
         "thresholds": thresholds,
@@ -169,6 +171,9 @@ def _decorate_snapshot_with_evidence(snapshot: dict, evidence_brief: dict) -> di
         metric["judgment_eligible"] = bool(state.get("judgment_eligible"))
         metric["days_stale"] = state.get("days_stale")
         metric["availability_reason"] = state.get("reason")
+        metric["responsibility"] = state.get("responsibility", role_entry.get("primary_responsibility"))
+        metric["axis_relevance"] = state.get("axis_relevance", role_entry.get("axis_relevance", []))
+        metric["correlation_family"] = state.get("correlation_family", role_entry.get("correlation_family"))
     return snapshot
 
 
@@ -185,8 +190,13 @@ def _build_series_entry(ind: IndicatorSpec) -> dict:
     thresholds = []
     for ref in chart_refs:
         label = ref["label"]
+        tier_id = ref.get("tier_id")
         meaning = next(
-            (item["meaning"] for item in display.thresholds if item["label"] == label),
+            (
+                item["meaning"]
+                for item in display.thresholds
+                if (tier_id and item.get("tier_id") == tier_id) or item["label"] == label
+            ),
             f"指标验证参考线：{label}",
         )
         thresholds.append({
@@ -194,6 +204,7 @@ def _build_series_entry(ind: IndicatorSpec) -> dict:
             "direction": chart_direction,
             "label": label,
             "meaning": meaning,
+            "tier_id": tier_id or next((item.get("tier_id") for item in display.thresholds if item.get("label") == label), "none"),
         })
 
     # Keep the validation panel's complete line set in the public packet. The
@@ -273,6 +284,9 @@ def build_packet(
     reason: str | None,
     run_id: str,
     generated_at: str,
+    histories: dict[str, object] | None = None,
+    previous_records: list[dict] | None = None,
+    previous_three_days: list[dict] | None = None,
 ) -> dict:
     """Assemble the single dashboard packet from real computed data.
 
@@ -284,7 +298,13 @@ def build_packet(
     data_date = computed.data_date
     price_now = computed.price[data_date]
     snapshot = build_snapshot(computed)
-    evidence_brief = compile_evidence(snapshot, analysis_date=data_date.isoformat())
+    evidence_brief = compile_evidence(
+        snapshot,
+        analysis_date=data_date.isoformat(),
+        histories=histories,
+        previous_records=previous_records,
+        previous_three_days=previous_three_days,
+    )
     _decorate_snapshot_with_evidence(snapshot, evidence_brief)
 
     series_metrics = {packet_display.BY_CANONICAL[ind.id].display_id: _build_series_entry(ind) for ind in computed.indicators}
@@ -327,7 +347,12 @@ def build_packet(
             "today_available": today_available,
             "last_success_date": last_success_date,
             "reason": reason,
-            "data_insufficient": not evidence_brief["data_quality"]["stage_ready"],
+            "data_insufficient": any(
+                not bool(item.get("ready"))
+                for item in evidence_brief["axis_readiness"].values()
+                if isinstance(item, dict)
+            ),
+            "axis_readiness": evidence_brief["axis_readiness"],
             "data_quality": evidence_brief["data_quality"],
         },
     }
@@ -342,7 +367,7 @@ def build_packet(
 _REQUIRED_METRIC_FIELDS = (
     "id", "label", "category", "role", "unit", "description", "formula",
     "source", "method", "caveat", "current_value", "display_value",
-    "current_date", "tier_label", "tier_meaning", "thresholds",
+    "current_date", "tier_id", "tier_label", "tier_meaning", "thresholds",
 )
 
 
@@ -350,18 +375,11 @@ def _validate_analysis_shape(
     payload: dict | None,
     where: str,
     errors: list[str],
-    *,
-    allowed_stages: list[str] | tuple[str, ...] | None = None,
-    require_pressure_summary: bool = False,
 ) -> None:
     if payload is None:
         return
     try:
-        ai_validator.validate_analysis(
-            payload,
-            allowed_stages=allowed_stages,
-            require_pressure_summary=require_pressure_summary,
-        )
+        ai_validator.validate_analysis(payload)
     except ai_validator.InvalidAnalysisError as exc:
         for err in exc.errors:
             errors.append(f"{where}: {err}")
@@ -392,15 +410,6 @@ def validate_packet(packet: dict) -> None:
                 missing = [f for f in _REQUIRED_METRIC_FIELDS if f not in metric]
                 if missing:
                     errors.append(f"snapshot.metrics[{index}] 缺字段: {', '.join(missing)}")
-                if packet.get("schema_version") == "0.3.0":
-                    v03_missing = [
-                        field for field in ("availability_status", "judgment_eligible")
-                        if field not in metric
-                    ]
-                    if v03_missing:
-                        errors.append(
-                            f"snapshot.metrics[{index}] 缺 v0.3 字段: {', '.join(v03_missing)}"
-                        )
                 thr = metric.get("thresholds")
                 if not isinstance(thr, list) or not thr:
                     errors.append(f"snapshot.metrics[{index}].thresholds 必须非空列表")
@@ -478,24 +487,18 @@ def validate_packet(packet: dict) -> None:
             errors.append("status.today_available 必须是布尔")
 
     evidence_brief = packet.get("evidence_brief")
-    brief_allowed: list[str] | None = None
-    brief_requires_pressure = False
-    if evidence_brief is not None:
-        if not isinstance(evidence_brief, dict):
-            errors.append("evidence_brief 必须是对象")
-        else:
-            brief_allowed_raw = evidence_brief.get("allowed_stages")
-            if not isinstance(brief_allowed_raw, list) or not brief_allowed_raw:
-                errors.append("evidence_brief.allowed_stages 必须是非空列表")
-            else:
-                brief_allowed = [str(stage) for stage in brief_allowed_raw]
-            if not isinstance(evidence_brief.get("core_dimensions"), dict):
-                errors.append("evidence_brief.core_dimensions 必须是对象")
-            if not isinstance(evidence_brief.get("data_quality"), dict):
-                errors.append("evidence_brief.data_quality 必须是对象")
-            if not isinstance(evidence_brief.get("metric_states"), list) or len(evidence_brief.get("metric_states", [])) != METRIC_COUNT:
-                errors.append(f"evidence_brief.metric_states 必须包含 {METRIC_COUNT} 项")
-            brief_requires_pressure = bool(evidence_brief.get("strong_auxiliary_themes"))
+    if not isinstance(evidence_brief, dict):
+        errors.append("evidence_brief 必须是对象")
+    else:
+        if evidence_brief.get("brief_version") != "0.4.0":
+            errors.append("evidence_brief.brief_version 必须为 0.4.0")
+        if "allowed_stages" in evidence_brief:
+            errors.append("v0.4 evidence_brief 不得包含 allowed_stages")
+        readiness = evidence_brief.get("axis_readiness")
+        if not isinstance(readiness, dict) or set(readiness) != {"pressure", "bottoming"}:
+            errors.append("evidence_brief.axis_readiness 必须同时包含 pressure 与 bottoming")
+        if not isinstance(evidence_brief.get("metric_states"), list) or len(evidence_brief.get("metric_states", [])) != METRIC_COUNT:
+            errors.append(f"evidence_brief.metric_states 必须包含 {METRIC_COUNT} 项")
 
     # --- date consistency ---
     data_date = packet.get("data_date")
@@ -513,22 +516,26 @@ def validate_packet(packet: dict) -> None:
             errors.append("today_available=true 时 analysis 不能为空")
         elif analysis.get("analysis_date") != data_date:
             errors.append("analysis.analysis_date 必须等于 data_date")
+        elif isinstance(evidence_brief, dict):
+            readiness = evidence_brief.get("axis_readiness")
+            for axis in ("pressure", "bottoming"):
+                axis_state = readiness.get(axis) if isinstance(readiness, dict) else None
+                if isinstance(axis_state, dict) and axis_state.get("ready") is False and analysis.get(f"{axis}_state") != "数据不足":
+                    errors.append(f"analysis.{axis}_state 在对应轴数据未就绪时必须为数据不足")
     else:
         if analysis is not None:
             errors.append("today_available=false 时 analysis 必须为 null")
 
     # --- AI compliance (forbidden trading/probability language) ---
-    _validate_analysis_shape(
-        analysis,
-        "analysis",
-        errors,
-        allowed_stages=brief_allowed,
-        require_pressure_summary=brief_requires_pressure,
-    )
+    _validate_analysis_shape(analysis, "analysis", errors)
     # A carried-forward fallback belongs to its original evidence brief; it is
     # intentionally validated for general safety but not against today's stage
     # range.
-    _validate_analysis_shape(packet.get("fallback"), "fallback", errors)
+    fallback = packet.get("fallback")
+    _validate_analysis_shape(fallback, "fallback", errors)
+    for where, payload in (("analysis", analysis), ("fallback", fallback)):
+        if payload is not None and not is_v04_analysis(payload):
+            errors.append(f"{where} 必须是 v0.4 双轴分析，不能沿用旧单阶段结果")
 
     if errors:
         raise PacketValidationError("；".join(errors))

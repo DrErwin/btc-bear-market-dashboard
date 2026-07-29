@@ -1,14 +1,14 @@
-"""Run repeatable AI explanation checks against the ten v0.3 fixtures.
+"""Run repeatable v0.4 AI explanation checks against fixed evidence scenarios.
 
 With ``--real`` and ``AI_API_KEY`` this calls the configured provider.  Without
-that flag it uses the same deterministic mock path used by local acceptance,
-which keeps the evidence artifact reproducible and secret-free.
+that flag it uses the deterministic mock path used by local acceptance.  The
+artifact records dual-axis states and readiness; it never reports a legacy
+single-stage range as an answer.
 """
 
 from __future__ import annotations
 
 import argparse
-import copy
 import json
 import sys
 from datetime import datetime, timezone
@@ -26,7 +26,7 @@ from tests.acceptance.evidence_test_utils import clone_snapshot  # noqa: E402
 
 FIXTURE_PATH = ROOT / "tests" / "fixtures" / "evidence" / "v0.3.0-scenarios.json"
 PACKET_PATH = ROOT / "dashboard" / "public" / "data" / "packet.json"
-ARTIFACT_DIR = ROOT / "artifacts" / "review-evidence" / "v0.3.0"
+ARTIFACT_DIR = ROOT / "artifacts" / "review-evidence" / "v0.4.0"
 
 
 def _load_scenarios() -> list[dict]:
@@ -34,9 +34,7 @@ def _load_scenarios() -> list[dict]:
     templates = fixture["metric_templates"]
     scenarios: list[dict] = []
     for raw in fixture["scenarios"]:
-        metrics = {
-            metric_id: dict(template) for metric_id, template in templates.items()
-        }
+        metrics = {metric_id: dict(template) for metric_id, template in templates.items()}
         for metric_id, override in raw.get("metric_overrides", {}).items():
             metrics[metric_id].update(override)
         scenarios.append({**raw, "analysis_date": fixture["analysis_date"], "metrics": metrics})
@@ -63,9 +61,10 @@ def _compact_analysis(analysis: dict | None) -> dict | None:
         return None
     return {
         "analysis_date": analysis.get("analysis_date"),
-        "stage": analysis.get("stage"),
+        "pressure_state": analysis.get("pressure_state"),
+        "bottoming_state": analysis.get("bottoming_state"),
+        "consistency": analysis.get("consistency"),
         "summary": analysis.get("summary"),
-        "pressure_summary": analysis.get("pressure_summary", ""),
         "compact": analysis.get("compact"),
         "detailed": analysis.get("detailed"),
     }
@@ -82,44 +81,26 @@ def run(*, real: bool) -> tuple[dict, int]:
         brief = compile_evidence(snapshot, analysis_date=scenario["analysis_date"])
         _decorate_snapshot_with_evidence(snapshot, brief)
         ai_input = build_evidence_input(snapshot, evidence_brief=brief)
-        if brief["allowed_stages"] != scenario["expected_allowed_stages"]:
-            failures.append(f"{scenario['id']}: allowed_stages={brief['allowed_stages']}")
-
         analysis, reason = provider.call_ai(
             snapshot,
             data_date=scenario["analysis_date"],
             mock=not real,
+            evidence_brief=brief,
         )
-        ai_called = brief["data_quality"]["stage_ready"]
-        if ai_called and analysis is None:
-            failures.append(f"{scenario['id']}: expected AI output, got {reason}")
-        if not ai_called and analysis is not None:
-            failures.append(f"{scenario['id']}: stale critical data still produced AI output")
-        if analysis is not None:
-            if analysis.get("stage") not in brief["allowed_stages"]:
-                failures.append(f"{scenario['id']}: stage outside allowed range")
+        if analysis is None:
+            failures.append(f"{scenario['id']}: no v0.4 analysis: {reason}")
+        else:
             try:
-                validator.validate_analysis(
-                    analysis,
-                    allowed_stages=brief["allowed_stages"],
-                    require_pressure_summary=bool(brief["strong_auxiliary_themes"]),
-                )
+                validator.validate_analysis(analysis)
                 semantic_validator.validate_analysis_semantics(analysis, ai_input)
             except validator.InvalidAnalysisError as exc:
                 failures.append(f"{scenario['id']}: {'; '.join(exc.errors[:3])}")
-            if brief["strong_auxiliary_themes"] and not str(analysis.get("pressure_summary", "")).strip():
-                failures.append(f"{scenario['id']}: strong auxiliary pressure was not explained")
-
         records.append(
             {
                 "scenario_id": scenario["id"],
                 "description": scenario["description"],
-                "allowed_stages": brief["allowed_stages"],
-                "strong_auxiliary_themes": brief["strong_auxiliary_themes"],
-                "contrary_or_incomplete": brief["contrary_or_incomplete"],
-                "data_quality": brief["data_quality"],
+                "axis_readiness": brief["axis_readiness"],
                 "ai_input": ai_input,
-                "ai_called": ai_called,
                 "provider_mode": "real" if real else "mock",
                 "analysis": _compact_analysis(analysis),
                 "reason": reason,
@@ -127,7 +108,7 @@ def run(*, real: bool) -> tuple[dict, int]:
         )
 
     artifact = {
-        "artifact_version": "0.3.0",
+        "artifact_version": "0.4.0",
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "provider_mode": "real" if real else "mock",
         "records": records,
@@ -142,7 +123,7 @@ def run(*, real: bool) -> tuple[dict, int]:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Verify v0.3 AI explanations against fixed evidence briefs")
+    parser = argparse.ArgumentParser(description="Verify v0.4 AI explanations against fixed evidence briefs")
     parser.add_argument("--real", action="store_true", help="call the configured AI provider instead of mock mode")
     args = parser.parse_args()
     _, code = run(real=args.real)

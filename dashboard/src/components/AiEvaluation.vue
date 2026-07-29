@@ -10,9 +10,7 @@ const props = defineProps<{
   dataInsufficient?: boolean;
 }>();
 
-const emit = defineEmits<{
-  toggleDetails: [];
-}>();
+const emit = defineEmits<{ toggleDetails: [] }>();
 
 function statusLabel() {
   if (props.todayAvailable) return "今日已保存";
@@ -26,8 +24,8 @@ function statusLabel() {
     <div v-if="dataInsufficient" class="availability-banner" role="status">
       <span class="availability-icon" aria-hidden="true">!</span>
       <div>
-        <strong>当前数据不足</strong>
-        <span>关键锚数据没有同时通过新鲜度检查，系统没有调用 AI，也没有把缺失数据当作未触发。</span>
+        <strong>部分市场状态数据不足</strong>
+        <span>压力轴和筑底过程轴分别检查数据；缺失数据没有被当作“没有压力”或反向证据。</span>
       </div>
       <span class="availability-note">等待数据恢复</span>
     </div>
@@ -36,47 +34,47 @@ function statusLabel() {
       <span class="availability-icon" aria-hidden="true">!</span>
       <div>
         <strong>今日 AI 分析不可用</strong>
-        <span v-if="fallback">当前展示上一份成功结果，日期为 {{ fallback.analysis_date }}。</span>
-        <span v-else>目前没有上一份成功结果，页面仅保留指标检查功能。</span>
+        <span v-if="fallback">当前展示上一份完整双轴结果，日期为 {{ fallback.analysis_date }}。</span>
+        <span v-else>目前没有上一份完整双轴结果，页面仅保留指标检查功能。</span>
       </div>
       <span class="availability-note">{{ statusLabel() }}</span>
     </div>
 
     <template v-if="analysis">
-      <div class="evaluation-head">
-        <div class="stage-hero">
-          <span class="eyebrow">当前市场阶段</span>
-          <h1 id="evaluation-title">{{ analysis.stage }}</h1>
+      <div class="evaluation-head dual-state-head">
+        <div class="state-hero pressure-hero">
+          <span class="eyebrow">压力深度</span>
+          <h1 id="evaluation-title">{{ analysis.pressure_state }}</h1>
+        </div>
+        <div class="state-hero bottoming-hero">
+          <span class="eyebrow">熊底过程</span>
+          <h1>{{ analysis.bottoming_state }}</h1>
         </div>
         <div class="evaluation-copy">
           <p class="evaluation-summary">{{ analysis.summary }}</p>
-          <p v-if="analysis.pressure_summary?.trim()" class="pressure-summary">
-            <span class="pressure-summary-label">阶段内部压力</span>
-            <span>{{ analysis.pressure_summary }}</span>
-          </p>
         </div>
-        <div class="consistency-pill" :data-level="analysis.consistency">
+        <div class="consistency-pill" :data-level="analysis.consistency ?? '数据不足'">
           <span>证据一致性</span>
-          <strong>{{ analysis.consistency }}</strong>
+          <strong>{{ analysis.consistency ?? "—" }}</strong>
           <small>{{ statusLabel() }}</small>
         </div>
       </div>
 
-      <div class="summary-blocks" aria-label="AI 摘要">
+      <div class="summary-blocks" aria-label="AI 双轴摘要">
         <article class="summary-block summary-support">
-          <span class="summary-index">01 / 核心支撑</span>
-          <h2>{{ analysis.compact.support.title }}</h2>
-          <p>{{ analysis.compact.support.text }}</p>
+          <span class="summary-index">01 / 压力轴</span>
+          <h2>{{ analysis.compact.pressure.title }}</h2>
+          <p>{{ analysis.compact.pressure.text }}</p>
         </article>
         <article class="summary-block summary-obstacle">
-          <span class="summary-index">02 / 主要阻力</span>
-          <h2>{{ analysis.compact.obstacle.title }}</h2>
-          <p>{{ analysis.compact.obstacle.text }}</p>
+          <span class="summary-index">02 / 筑底过程</span>
+          <h2>{{ analysis.compact.bottoming.title }}</h2>
+          <p>{{ analysis.compact.bottoming.text }}</p>
         </article>
         <article class="summary-block summary-next">
-          <span class="summary-index">03 / 下一阶段条件</span>
-          <h2>{{ analysis.compact.next.title }}</h2>
-          <p>{{ analysis.compact.next.text }}</p>
+          <span class="summary-index">03 / 近三日变化</span>
+          <h2>{{ analysis.compact.change.title }}</h2>
+          <p>{{ analysis.compact.change.text }}</p>
         </article>
       </div>
 

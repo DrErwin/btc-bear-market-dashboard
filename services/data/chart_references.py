@@ -12,10 +12,13 @@ from __future__ import annotations
 
 from typing import TypedDict
 
+from .packet_display import stable_tier_id_for_display
+
 
 class ChartReference(TypedDict):
     value: float
     label: str
+    tier_id: str
 
 
 class ChartReferenceConfig(TypedDict):
@@ -93,7 +96,7 @@ CHART_REFERENCES: dict[str, ChartReferenceConfig] = {
     },
     "thermocap_multiple_zscore": {
         "references": [
-            {"value": -0.6147138165, "label": "10%分位定投区"},
+            {"value": -0.6147138165, "label": "10%分位观察区"},
             {"value": -0.8703706199, "label": "5%分位深度压力区"},
         ],
         "direction": "below",
@@ -114,4 +117,16 @@ CHART_REFERENCES: dict[str, ChartReferenceConfig] = {
 def references_for(canonical_id: str) -> ChartReferenceConfig | None:
     """Return chart references for a canonical metric, if it is configured."""
 
-    return CHART_REFERENCES.get(canonical_id)
+    config = CHART_REFERENCES.get(canonical_id)
+    if config is None:
+        return None
+    return {
+        "direction": config["direction"],
+        "references": [
+            {
+                **reference,
+                "tier_id": stable_tier_id_for_display(canonical_id, index),
+            }
+            for index, reference in enumerate(config["references"])
+        ],
+    }

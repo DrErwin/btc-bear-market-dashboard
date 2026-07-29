@@ -1,4 +1,8 @@
-"""Migrate checked-in dashboard packets to the v0.3 evidence contract.
+"""Historical migration helper for reproducing the v0.3 packet contract.
+
+The current runtime and checked-in packets use v0.4.0; use
+``scripts/migrate_packet_v04.py`` for current fixture migration. This file is
+retained only for historical reproduction.
 
 This is an offline fixture migration.  It preserves the complete chart data,
 then recomputes the deterministic evidence brief and replaces only the old

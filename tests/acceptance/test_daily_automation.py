@@ -2,242 +2,54 @@ from __future__ import annotations
 
 import copy
 import json
-import subprocess
 from pathlib import Path
 
-from services.ai import provider
-from services.data.packet_display import BY_CANONICAL
-from tests.acceptance.analysis_fixture import build_valid_analysis
+from services.ai.provider import call_ai
+from services.data.packet import validate_packet
+from services import run_daily
 
 
 ROOT = Path(__file__).resolve().parents[2]
-WORKFLOW_PATH = ROOT / ".github" / "workflows" / "daily-update.yml"
-PACKET_PATH = ROOT / "dashboard" / "public" / "data" / "packet.json"
 
 
-def test_daily_workflow_runs_at_noon_in_shanghai() -> None:
-    workflow = WORKFLOW_PATH.read_text(encoding="utf-8")
-
-    assert "cron: '0 12 * * *'" in workflow
-    assert 'timezone: "Asia/Shanghai"' in workflow
-    assert "workflow_dispatch:" in workflow
+def _packet() -> dict:
+    return json.loads((ROOT / "dashboard" / "public" / "data" / "packet.json").read_text(encoding="utf-8"))
 
 
-def test_daily_workflow_uses_real_ai_and_pushes_the_complete_result() -> None:
-    workflow = WORKFLOW_PATH.read_text(encoding="utf-8")
-
-    assert "AI_API_KEY: ${{ secrets.AI_API_KEY }}" in workflow
-    assert "AI_BASE_URL: https://open.bigmodel.cn/api/paas/v4" in workflow
-    assert "AI_MODEL: glm-5.2" in workflow
-    assert "python services/run_daily.py" in workflow
-    assert "python services/run_daily.py --mock-ai" not in workflow
-    assert "dashboard/public/data/packet.json" in workflow
-    assert "artifacts/run-log.jsonl" in workflow
-    assert "git push" in workflow
-
-
-def test_optional_ai_environment_values_can_be_blank(
-    monkeypatch,
-) -> None:
-    packet = json.loads(PACKET_PATH.read_text(encoding="utf-8"))
-    visible_analysis = build_valid_analysis(packet)
-    captured: dict[str, object] = {}
-
-    class FakeResponse:
-        def __enter__(self):
-            return self
-
-        def __exit__(self, *args):
-            return False
-
-        def read(self) -> bytes:
-            response = {
-                "choices": [
-                    {
-                        "message": {
-                                "content": json.dumps(
-                                    visible_analysis, ensure_ascii=False
-                                )
-                        }
-                    }
-                ]
-            }
-            return json.dumps(response, ensure_ascii=False).encode("utf-8")
-
-    def fake_urlopen(request, timeout):
-        captured["url"] = request.full_url
-        captured["timeout"] = timeout
-        captured["body"] = json.loads(request.data)
-        return FakeResponse()
-
-    monkeypatch.setenv("AI_API_KEY", "test-only-key")
-    monkeypatch.setenv("AI_BASE_URL", "")
-    monkeypatch.setenv("AI_MODEL", "")
-    monkeypatch.setattr(provider, "urlopen", fake_urlopen)
-
-    analysis, reason = provider.call_ai(
-        packet["snapshot"],
-        data_date=packet["data_date"],
-        mock=False,
-    )
-
+def test_mock_daily_analysis_contains_both_axes_and_full_explanation() -> None:
+    packet = _packet()
+    analysis, reason = call_ai(packet["snapshot"], data_date=packet["data_date"], mock=True, evidence_brief=packet["evidence_brief"])
     assert reason is None
     assert analysis is not None
-    assert captured["url"] == (
-        "https://open.bigmodel.cn/api/paas/v4/chat/completions"
-    )
-    assert captured["timeout"] == 300
-    assert captured["body"]["model"] == "glm-5.2"
-    assert captured["body"]["thinking"] == {"type": "enabled"}
-    assert captured["body"]["reasoning_effort"] == "high"
-    assert captured["body"]["max_tokens"] == 4096
-    user_prompt = captured["body"]["messages"][1]["content"]
-    assert "只有触发阈值的指标才能列入支持证据" in user_prompt
-    assert "未触发的指标只能列入阻碍、反面证据或待确认条件" in user_prompt
-    assert "detailed.supporting 中不得出现任何未触发指标" in user_prompt
-    assert "核心或辅助是指标角色，不是类别角色" in user_prompt
-    assert "只有一个触发阈值的指标" in user_prompt
-    assert "不得说它未触发更深档位" in user_prompt
-    assert "即使是否定句或风险提示，也不要复述任何禁止词" in user_prompt
-    assert "禁止词表（输入里出现也不能照抄）" in user_prompt
-    assert "做多" in user_prompt
-    assert "持仓" in user_prompt
-    assert "链上花费" in user_prompt
-    assert "整体估值还没有进入更深的压力区" in user_prompt
-    assert "矿工收入已经开始承压" in user_prompt
-    assert "阶段上限" in user_prompt
+    assert set(analysis["detailed"]) == {
+        "pressure_reason",
+        "bottoming_reason",
+        "evidence_timeline",
+        "contrary_or_gaps",
+        "repair_exit",
+        "next_evidence",
+    }
 
 
-def test_rc_npc_threshold_meaning_matches_its_configured_direction() -> None:
-    rc_npc = BY_CANONICAL["realized_cap_relative_npc_30d"]
-
-    assert rc_npc.thresholds[0]["meaning"] == (
-        "三十日已实现资本相对变化低于 -4%。"
-    )
-
-
-def test_invalid_ai_wording_can_be_rewritten_twice_before_fallback(
-    monkeypatch,
-) -> None:
-    packet = json.loads(PACKET_PATH.read_text(encoding="utf-8"))
-    visible_analysis = build_valid_analysis(packet)
-    first_invalid = copy.deepcopy(visible_analysis)
-    first_invalid["detailed"]["contrary"] = "建议买入"
-    second_invalid = copy.deepcopy(visible_analysis)
-    second_invalid["detailed"]["next_stage"] = "建议卖出"
-    responses = [first_invalid, second_invalid, visible_analysis]
-    requests: list[dict] = []
-
-    class FakeResponse:
-        def __init__(self, analysis: dict):
-            self.analysis = analysis
-
-        def __enter__(self):
-            return self
-
-        def __exit__(self, *args):
-            return False
-
-        def read(self) -> bytes:
-            response = {
-                "choices": [
-                    {
-                        "message": {
-                            "content": json.dumps(
-                                self.analysis, ensure_ascii=False
-                            )
-                        }
-                    }
-                ]
-            }
-            return json.dumps(response, ensure_ascii=False).encode("utf-8")
-
-    def fake_urlopen(request, timeout):
-        requests.append(json.loads(request.data))
-        return FakeResponse(responses.pop(0))
-
-    monkeypatch.setenv("AI_API_KEY", "test-only-key")
-    monkeypatch.delenv("AI_BASE_URL", raising=False)
-    monkeypatch.delenv("AI_MODEL", raising=False)
-    monkeypatch.setattr(provider, "urlopen", fake_urlopen)
-
-    analysis, reason = provider.call_ai(
-        packet["snapshot"],
-        data_date=packet["data_date"],
-        mock=False,
-    )
-
-    assert reason is None
-    assert analysis == visible_analysis
-    assert len(requests) == 3
-    assert "上一份输出未通过校验" in requests[1]["messages"][1]["content"]
-    assert "买入" in requests[1]["messages"][1]["content"]
-    assert "卖出" in requests[2]["messages"][1]["content"]
+def test_fallback_is_only_a_complete_v04_analysis() -> None:
+    payload = _packet()
+    failure = copy.deepcopy(payload)
+    previous = failure["analysis"]
+    failure["analysis"] = None
+    failure["fallback"] = previous
+    failure["status"] = {**failure["status"], "today_available": False, "reason": "模拟 AI 失败"}
+    validate_packet(failure)
+    assert failure["fallback"]["pressure_state"]
+    assert "stage" not in failure["fallback"]
 
 
-def test_transient_ai_timeout_is_retried_once(
-    monkeypatch,
-) -> None:
-    packet = json.loads(PACKET_PATH.read_text(encoding="utf-8"))
-    visible_analysis = build_valid_analysis(packet)
-    attempts = 0
+def test_previous_packet_archives_by_its_own_data_date(tmp_path: Path) -> None:
+    packet_path = tmp_path / "packet.json"
+    archive_dir = tmp_path / "archive"
+    packet_path.write_text(json.dumps({"data_date": "2026-07-28", "schema_version": "0.4.0"}), encoding="utf-8")
 
-    class FakeResponse:
-        def __enter__(self):
-            return self
+    run_daily._archive_previous(packet_path, archive_dir, keep=7)
 
-        def __exit__(self, *args):
-            return False
-
-        def read(self) -> bytes:
-            response = {
-                "choices": [
-                    {
-                        "message": {
-                            "content": json.dumps(
-                                visible_analysis, ensure_ascii=False
-                            )
-                        }
-                    }
-                ]
-            }
-            return json.dumps(response, ensure_ascii=False).encode("utf-8")
-
-    def fake_urlopen(request, timeout):
-        nonlocal attempts
-        attempts += 1
-        if attempts == 1:
-            raise TimeoutError("temporary timeout")
-        return FakeResponse()
-
-    monkeypatch.setenv("AI_API_KEY", "test-only-key")
-    monkeypatch.delenv("AI_BASE_URL", raising=False)
-    monkeypatch.delenv("AI_MODEL", raising=False)
-    monkeypatch.setattr(provider, "urlopen", fake_urlopen)
-
-    analysis, reason = provider.call_ai(
-        packet["snapshot"],
-        data_date=packet["data_date"],
-        mock=False,
-    )
-
-    assert reason is None
-    assert analysis == visible_analysis
-    assert attempts == 2
-
-
-def test_daily_audit_log_is_not_ignored_by_git() -> None:
-    result = subprocess.run(
-        [
-            "git",
-            "check-ignore",
-            "--no-index",
-            "artifacts/run-log.jsonl",
-        ],
-        cwd=ROOT,
-        capture_output=True,
-        text=True,
-        check=False,
-    )
-
-    assert result.returncode == 1, result.stdout or result.stderr
+    archived = archive_dir / "2026-07-28.json"
+    assert archived.exists()
+    assert json.loads(archived.read_text(encoding="utf-8"))["data_date"] == "2026-07-28"

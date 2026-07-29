@@ -1,42 +1,32 @@
-/**
- * A metric's fixed evidence role. The two short values are kept so that
- * v0.2 packets can still be read while the evidence registry migrates.
- */
-export type Role =
-  | "核心锚"
-  | "核心复核"
-  | "强辅助"
-  | "辅助"
-  | "核心"
-  | "supporting"
-  | "core";
+export type Role = "核心锚" | "核心复核" | "强辅助" | "辅助";
 
-/** Whether this metric may enter the current evidence brief. */
 export type MetricAvailabilityStatus =
   | "current"
   | "display_only"
   | "validation_pending"
-  | "missing"
-  | "当前可用"
-  | "仅供展示"
-  | "待验证"
-  | "缺失";
+  | "missing";
+
 export type CategoryStatus = "未确认" | "部分确认" | "充分确认";
 export type Consistency = "弱" | "中等" | "强";
-export type Stage =
-  | "尚未进入熊底观察期"
-  | "熊市下行期"
-  | "深度压力期"
-  | "筑底证据积累期"
-  | "熊底证据充分期"
+export type PressureState = "压力尚未明显" | "进入观察" | "深度压力" | "极端压力" | "数据不足";
+export type BottomingState =
+  | "未见筑底结构"
+  | "筑底线索出现"
+  | "筑底证据聚合"
+  | "筑底证据较完整"
+  | "市场修复中"
+  | "已离开底部窗口"
   | "数据不足";
+export type StableTierId = "none" | "observation" | "deep_pressure" | "extreme_pressure";
 
 export interface Threshold {
   value: number;
   direction: "below" | "above";
   label: string;
   meaning: string;
+  tier_id?: StableTierId;
   role?: "trigger" | "neutral";
+  triggered?: boolean | null;
 }
 
 export interface Metric {
@@ -53,16 +43,20 @@ export interface Metric {
   current_value: number;
   display_value: string;
   current_date: string;
+  tier_id: StableTierId;
   tier_label: string;
   tier_meaning: string;
   thresholds: Threshold[];
-  /** v0.3 evidence/data-quality fields. Optional for v0.2 fixture compatibility. */
-  availability_status?: MetricAvailabilityStatus | string | null;
+  canonical_id?: string;
+  responsibility?: string;
+  axis_relevance?: string[];
+  correlation_family?: string;
+  availability_status?: MetricAvailabilityStatus | null;
+  availability_label?: string | null;
   judgment_eligible?: boolean | null;
   days_stale?: number | null;
   availability_reason?: string | null;
-  /** Evidence-brief aliases accepted during packet assembly migration. */
-  status?: MetricAvailabilityStatus | string | null;
+  status?: MetricAvailabilityStatus | null;
   reason?: string | null;
   metric_date?: string | null;
 }
@@ -73,34 +67,79 @@ export interface Category {
   name: string;
 }
 
-export interface Snapshot {
-  snapshot_date: string;
-  price: {
-    current_value: number;
-    display_value: string;
-    unit: string;
-    current_date: string;
-  };
-  categories: Category[];
-  metrics: Metric[];
+export interface EvidenceBrief {
+  brief_version: string;
+  analysis_date: string;
+  state_vocabularies?: Record<string, unknown>;
+  axis_readiness: Record<"pressure" | "bottoming", AxisReadiness>;
+  metric_states: Array<Record<string, unknown>>;
+  evidence_families?: Array<Record<string, unknown>>;
+  themes?: Array<Record<string, unknown>>;
+  contrary_or_gaps?: Array<Record<string, unknown>>;
+  timeline?: Record<string, unknown>;
+  previous_three_days?: PreviousDayContext[];
+  lookback_config?: Record<string, unknown>;
+  data_quality?: Record<string, unknown>;
 }
 
-export interface EvidenceBrief {
-  brief_version?: string;
-  analysis_date?: string;
-  allowed_stages: string[];
-  core_dimensions: Record<string, unknown>;
-  strong_auxiliary_themes: Array<Record<string, unknown>>;
-  auxiliary_themes?: Array<Record<string, unknown>>;
-  contrary_or_incomplete?: Array<Record<string, unknown>>;
-  next_stage_conditions?: string[];
-  data_quality: {
-    stage_ready?: boolean;
-    critical_missing?: string[];
-    common_anchor_date?: string | null;
-    [key: string]: unknown;
+export interface AxisReadiness {
+  ready: boolean;
+  required_metric_ids?: string[];
+  missing_metric_ids?: string[];
+  missing_reasons?: string[];
+  family_coverage?: number;
+  timeline_complete?: boolean;
+  [key: string]: unknown;
+}
+
+export interface PreviousDayContext {
+  date: string;
+  status: "current" | "fallback" | "missing" | "incompatible";
+  analysis_date?: string | null;
+  pressure_state?: PressureState | null;
+  bottoming_state?: BottomingState | null;
+  consistency?: Consistency | null;
+  reason?: string | null;
+}
+
+export interface CategoryAssessment {
+  id: string;
+  status: CategoryStatus;
+  note: string;
+}
+
+export interface StateChange {
+  changed: boolean;
+  from: string | null;
+  to: string | null;
+  reason: string;
+  compared_date?: string | null;
+}
+
+export interface Analysis {
+  analysis_date: string;
+  pressure_state: PressureState;
+  bottoming_state: BottomingState;
+  consistency: Consistency | null;
+  summary: string;
+  compact: {
+    pressure: { title: string; text: string };
+    bottoming: { title: string; text: string };
+    change: { title: string; text: string };
   };
-  metric_states?: Array<Record<string, unknown>>;
+  categories: CategoryAssessment[];
+  detailed: {
+    pressure_reason: string;
+    bottoming_reason: string;
+    evidence_timeline: string;
+    contrary_or_gaps: string;
+    repair_exit: string;
+    next_evidence: string;
+  };
+  state_changes?: {
+    pressure: StateChange;
+    bottoming: StateChange;
+  };
 }
 
 export interface SeriesPoint {
@@ -120,7 +159,6 @@ export interface MetricLine {
 export interface MetricSeries {
   points: SeriesPoint[];
   thresholds: Threshold[];
-  /** Every visible validation-panel curve, including the primary line. */
   lines?: MetricLine[];
 }
 
@@ -129,7 +167,6 @@ export interface SeriesData {
   metrics: Record<string, MetricSeries>;
 }
 
-/** Requirement 3 bars: HODLer capitulation + >=155d spent share. */
 export type BarQuality = "ok" | "missing" | "undetermined";
 
 export interface BarPoint {
@@ -149,47 +186,9 @@ export interface BarSeries {
   points: BarPoint[];
 }
 
-/** Historical bear-bottom markers (vertical dashed lines on the main chart). */
 export interface BottomMark {
   date: string;
   label: string;
-}
-
-export interface CategoryAssessment {
-  id: string;
-  status: CategoryStatus;
-  note: string;
-}
-
-export interface Analysis {
-  analysis_date: string;
-  stage: Stage;
-  consistency: Consistency;
-  summary: string;
-  /** A short ordinary-reader explanation of strong auxiliary pressure, if any. */
-  pressure_summary?: string | null;
-  compact: {
-    support: { title: string; text: string };
-    obstacle: { title: string; text: string };
-    next: { title: string; text: string };
-  };
-  categories: CategoryAssessment[];
-  detailed: {
-    /** Legacy v0.2 name for the core evidence section. */
-    supporting?: string;
-    /** Preferred v0.3 name for the core evidence section. */
-    core_evidence?: string;
-    core?: string;
-    /** Strong auxiliary evidence explained without moving the stage ceiling. */
-    pressure?: string;
-    contrary?: string;
-    next_stage?: string;
-    /** v0.3 data-quality limits; aliases keep early fixtures readable. */
-    data_limit?: string;
-    data_limits?: string;
-    data_quality?: string;
-    limitations?: string;
-  };
 }
 
 export interface StatusData {
@@ -197,14 +196,10 @@ export interface StatusData {
   last_success_date: string | null;
   reason: string | null;
   data_insufficient?: boolean;
+  axis_readiness?: Record<"pressure" | "bottoming", AxisReadiness>;
   data_quality?: Record<string, unknown>;
 }
 
-/**
- * Requirement 1: a single complete packet. The page reads exactly one of these
- * (the current success, or a fallback fixture via ?fixture=); snapshot, series,
- * bars, analysis and status never update independently.
- */
 export interface Packet {
   schema_version: string;
   run_id: string;
@@ -218,8 +213,18 @@ export interface Packet {
     price: { date: string; value: number };
     source: Record<string, unknown>;
   };
-  snapshot: Snapshot;
-  evidence_brief?: EvidenceBrief;
+  snapshot: {
+    snapshot_date: string;
+    price: {
+      current_value: number;
+      display_value: string;
+      unit: string;
+      current_date: string;
+    };
+    categories: Category[];
+    metrics: Metric[];
+  };
+  evidence_brief: EvidenceBrief;
   series: SeriesData;
   bars: Record<string, BarSeries>;
   bottoms: BottomMark[];
@@ -229,8 +234,8 @@ export interface Packet {
 }
 
 export interface DashboardData {
-  snapshot: Snapshot;
-  evidenceBrief?: EvidenceBrief;
+  snapshot: Packet["snapshot"];
+  evidenceBrief: EvidenceBrief;
   series: SeriesData;
   bars: Record<string, BarSeries>;
   bottoms: BottomMark[];

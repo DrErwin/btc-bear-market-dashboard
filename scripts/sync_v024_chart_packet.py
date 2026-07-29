@@ -46,6 +46,10 @@ DISPLAY_LABEL_OVERRIDES = {
     "reserve": "Reserve Risk · 周期",
 }
 
+PUBLIC_LABEL_RENAMES = {
+    "10%分位定投区": "10%分位观察区",
+}
+
 
 def _load_sources() -> tuple[dict, dict[str, dict]]:
     if not CONFIG_PATH.exists():
@@ -84,7 +88,7 @@ def _sync_packet(path: Path, config: dict, timeline_by_id: dict[str, dict]) -> N
             {
                 "value": reference["value"] * scale,
                 "direction": exported["direction"],
-                "label": reference["label"],
+                "label": PUBLIC_LABEL_RENAMES.get(reference["label"], reference["label"]),
                 "meaning": meanings.get(reference["label"])
                 or f"指标验证参考线：{reference['label']}",
             }

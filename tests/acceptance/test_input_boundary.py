@@ -1,138 +1,37 @@
 from __future__ import annotations
 
 import copy
-import json
-from collections.abc import Mapping
-from pathlib import Path
 
-from services.ai.input_builder import build_ai_input
-
-
-ROOT = Path(__file__).resolve().parents[2]
-PACKET_PATH = ROOT / "dashboard" / "public" / "data" / "packet.json"
+from services.ai.input_builder import build_evidence_input
+from services.evidence.compiler import compile_evidence
+from tests.acceptance.evidence_test_utils import make_snapshot
 
 
-def load_snapshot() -> dict:
-    packet = json.loads(PACKET_PATH.read_text(encoding="utf-8"))
-    return packet["snapshot"]
+def test_input_boundary_contains_dual_axis_facts_and_no_old_range() -> None:
+    snapshot = make_snapshot(aux_values={"rul-z": 2.7, "asopr": 0.9, "seller": 0.04})
+    brief = compile_evidence(snapshot)
+    request = build_evidence_input(snapshot, evidence_brief=brief)
+    assert request["contract_version"] == "0.4.0"
+    assert set(request["axis_readiness"]) == {"pressure", "bottoming"}
+    assert "allowed_stages" not in request
+    assert "market_stage_definitions" not in request
+    assert len(request["metric_states"]) == 16
+    assert request["previous_three_days"] and len(request["previous_three_days"]) == 3
 
 
-def walk_keys(value: object):
-    if isinstance(value, Mapping):
-        for key, child in value.items():
-            yield str(key)
-            yield from walk_keys(child)
-    elif isinstance(value, list):
-        for child in value:
-            yield from walk_keys(child)
+def test_input_has_actual_values_directions_and_stable_tier_ids() -> None:
+    request = build_evidence_input(make_snapshot(mvrv=0.7, puell=0.4))
+    mvrv = next(item for item in request["metric_states"] if item["id"] == "mvrv")
+    assert mvrv["value"] == 0.7
+    assert {item["direction"] for item in mvrv["thresholds"]} == {"below"}
+    assert mvrv["tier"]["id"] == "deep_pressure"
 
 
-def test_input_builder_emits_only_the_approved_snapshot_boundary() -> None:
-    snapshot = load_snapshot()
-    request = build_ai_input(load_snapshot())
-
-    assert set(request) == {
-        "market_stage_definitions",
-        "category_status_definitions",
-        "consistency_definitions",
-        "category_definitions",
-        "metrics",
-    }
-    assert len(request["metrics"]) == 16
-
-    assert [item["stage"] for item in request["market_stage_definitions"]] == [
-        "尚未进入熊底观察期",
-        "熊市下行期",
-        "深度压力期",
-        "筑底证据积累期",
-        "熊底证据充分期",
-        "数据不足",
-    ]
-    assert [item["status"] for item in request["category_status_definitions"]] == [
-        "未确认",
-        "部分确认",
-        "充分确认",
-    ]
-    assert [item["consistency"] for item in request["consistency_definitions"]] == [
-        "弱",
-        "中等",
-        "强",
-    ]
-
-    metric_keys = {
-        "id",
-        "name",
-        "meaning",
-        "category",
-        "role",
-        "current_value",
-        "thresholds",
-    }
-    threshold_keys = {"value", "direction", "label", "meaning"}
-    source_by_id = {metric["id"]: metric for metric in snapshot["metrics"]}
-
-    for metric in request["metrics"]:
-        assert set(metric) == metric_keys
-        source = source_by_id[metric["id"]]
-        assert metric["name"] == source["label"]
-        assert metric["meaning"] == source["description"]
-        assert metric["category"] == source["category"]
-        assert metric["role"] == source["role"]
-        assert metric["current_value"] == source["current_value"]
-        trigger_thresholds = [
-            threshold
-            for threshold in source["thresholds"]
-            if threshold.get("role", "trigger") != "neutral"
-        ]
-        assert len(metric["thresholds"]) == len(trigger_thresholds)
-        assert all(set(threshold) == threshold_keys for threshold in metric["thresholds"])
-
-
-def test_input_builder_excludes_neutral_chart_reference_lines() -> None:
-    snapshot = copy.deepcopy(load_snapshot())
-    thermocap = next(
-        metric for metric in snapshot["metrics"] if metric["id"] == "thermo"
-    )
-    thermocap["thresholds"].append({
-        "value": 0.0,
-        "direction": "below",
-        "label": "自身4年均值（中性）",
-        "meaning": "仅用于读图，不参与状态判断。",
-        "role": "neutral",
-    })
-
-    request = build_ai_input(snapshot)
-    ai_thermocap = next(
-        metric for metric in request["metrics"] if metric["id"] == "thermo"
-    )
-
-    assert all(
-        threshold["label"] != "自身4年均值（中性）"
-        for threshold in ai_thermocap["thresholds"]
-    )
-
-
-def test_input_builder_excludes_history_external_context_and_raw_source_metadata() -> None:
-    request = build_ai_input(load_snapshot())
-    keys = {key.casefold() for key in walk_keys(request)}
-
-    forbidden_keys = {
-        "series",
-        "trend",
-        "news",
-        "external",
-        "external_research",
-        "user_portfolio",
-        "portfolio",
-        "price",
-        "snapshot_date",
-        "current_date",
-        "display_value",
-        "formula",
-        "source",
-        "method",
-        "caveat",
-        "tier_label",
-        "tier_meaning",
-    }
-    assert keys.isdisjoint(forbidden_keys)
+def test_input_does_not_copy_history_or_private_action_provenance() -> None:
+    snapshot = make_snapshot()
+    snapshot["metrics"][0]["history"] = [{"date": "2026-07-01", "value": 0.5}]
+    snapshot["metrics"][0]["private_action"] = "internal calibration"
+    request = build_evidence_input(copy.deepcopy(snapshot))
+    encoded = str(request)
+    assert "2026-07-01" in encoded  # bounded timeline events are allowed
+    assert "private_action" not in encoded

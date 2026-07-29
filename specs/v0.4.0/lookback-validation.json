@@ -1,0 +1,19 @@
+{
+  "config_version": "v0.4.0-lookback-1",
+  "selected_days": 730,
+  "validation_status": "validated_local_fixture",
+  "candidate_days": [365, 730, 1095],
+  "candidate_coverage": [
+    {"days": 365, "series_with_coverage": 14, "series_without_coverage": 2, "expired_only_series": 2, "series_count": 16, "shortest_covered_span_days": 366, "longest_covered_span_days": 366},
+    {"days": 730, "series_with_coverage": 14, "series_without_coverage": 2, "expired_only_series": 2, "series_count": 16, "shortest_covered_span_days": 731, "longest_covered_span_days": 731},
+    {"days": 1095, "series_with_coverage": 14, "series_without_coverage": 2, "expired_only_series": 2, "series_count": 16, "shortest_covered_span_days": 1096, "longest_covered_span_days": 1096}
+  ],
+  "historical_cases": [
+    {"id": "2018-bottom-process", "purpose": "覆盖一次完整压力到筑底过程"},
+    {"id": "2020-covid-reversal", "purpose": "检查短暂修复后重新加压的反转"},
+    {"id": "2022-bottom-process", "purpose": "覆盖最近一次较长熊底过程"}
+  ],
+  "selection_reason": "365 日对完整熊底过程过短；1095 日会保留已经明显过期的早期证据；730 日在当前三组历史案例中覆盖完整过程，并限制过期证据继续支持今天。",
+  "thresholds_changed": false,
+  "review_note": "这是 v0.4 本地固定数据的验证记录；若生产数据源、历史案例或窗口定义变化，必须重新验证并更新本文件。"
+}

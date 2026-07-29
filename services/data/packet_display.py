@@ -32,6 +32,36 @@ CATEGORIES: dict[str, tuple[str, str]] = {
 
 
 UnitKind = Literal["ratio", "percent", "zscore", "small", "price"]
+TierId = Literal["none", "observation", "deep_pressure", "extreme_pressure"]
+
+
+_TIER_IDS_BY_CANONICAL: dict[str, tuple[TierId, ...]] = {
+    "mvrv": ("observation", "deep_pressure"),
+    "aviv": ("deep_pressure",),
+    "sth_mvrv_price": ("observation", "deep_pressure", "extreme_pressure"),
+    "psip": ("observation", "extreme_pressure"),
+    "sipl": ("deep_pressure",),
+    "relative_unrealized_profit": ("deep_pressure",),
+    "relative_unrealized_loss_zscore_4y": ("observation", "deep_pressure"),
+    "realized_cap_relative_npc_30d": ("deep_pressure",),
+    "asopr": ("deep_pressure", "observation"),
+    "hodler_npc_30d": ("deep_pressure",),
+    "spent_value_ge155d_share": ("observation",),
+    "seller_exhaustion": ("observation",),
+    "puell_multiple": ("observation", "deep_pressure"),
+    "thermocap_multiple_zscore": ("observation", "deep_pressure"),
+    "cvdd_proximity": ("extreme_pressure",),
+    "reserve_risk_zscore": ("observation", "deep_pressure"),
+}
+
+
+def stable_tier_id_for(canonical_id: str, index: int) -> TierId:
+    """Return the configured tier identity without inspecting display text."""
+
+    try:
+        return _TIER_IDS_BY_CANONICAL[canonical_id][index]
+    except (KeyError, IndexError) as exc:
+        raise ValueError(f"指标 {canonical_id} 缺少稳定档位配置 index={index}") from exc
 
 
 class IndicatorDisplay:
@@ -68,7 +98,15 @@ class IndicatorDisplay:
         self.source = source
         self.method = method
         self.caveat = caveat
-        self.thresholds = thresholds
+        self.thresholds = []
+        for index, threshold in enumerate(thresholds):
+            tier_id = stable_tier_id_for(canonical_id, index)
+            configured_id = threshold.get("tier_id")
+            if configured_id is not None and configured_id != tier_id:
+                raise ValueError(
+                    f"指标 {canonical_id} 的稳定档位配置不一致：{configured_id} != {tier_id}"
+                )
+            self.thresholds.append({**threshold, "tier_id": tier_id})
 
 
 # Ordered by category, then the catalogue order services/data/metrics.py emits.
@@ -217,7 +255,7 @@ INDICATORS: list[IndicatorDisplay] = [
         source="BRK / Bitview", method="log + 滚动四年 z-score（无前视）",
         caveat="归一化方法是相对自身周期的过热/过冷视角；绝对阈值底部 5-7 / 顶部 50-74 仍有效。",
         thresholds=[
-            {"label": "10%分位定投区", "meaning": "进入周期归一化的 10% 低位区。"},
+            {"label": "10%分位观察区", "meaning": "进入周期归一化的 10% 低位区。"},
             {"label": "5%分位深度压力区", "meaning": "进入周期归一化的 5% 深部区。"},
         ],
     ),
@@ -247,3 +285,11 @@ INDICATORS: list[IndicatorDisplay] = [
 
 BY_CANONICAL: dict[str, IndicatorDisplay] = {item.canonical_id: item for item in INDICATORS}
 BY_DISPLAY: dict[str, IndicatorDisplay] = {item.display_id: item for item in INDICATORS}
+
+
+def stable_tier_id_for_display(metric_id: str, index: int) -> TierId:
+    """Resolve a canonical or display id for offline fixture migrations."""
+
+    display = BY_DISPLAY.get(metric_id)
+    canonical_id = display.canonical_id if display else metric_id
+    return stable_tier_id_for(canonical_id, index)

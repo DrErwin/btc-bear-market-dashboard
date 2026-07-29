@@ -6,7 +6,7 @@
   `src/components/`, shared chart/data logic in `src/composables/` and
   `src/utils/`, and static packet fixtures in `public/data/`.
 - `services/` builds daily packets: `data/` derives metrics,
-  `evidence/` constrains stage evidence, and `ai/` builds and validates AI
+  `evidence/` constrains dual-axis evidence, and `ai/` builds and validates AI
   explanations.
 - `tests/acceptance/` holds pytest contracts and browser acceptance coverage;
   `tests/fixtures/` contains stable input scenarios.
@@ -57,7 +57,9 @@ changes.
 
 ## Product and Safety Constraints
 
-This is a public research dashboard, not trading advice. AI may only choose
-from machine-generated `allowed_stages`; it must not alter thresholds or give
-price, position, leverage, or timing advice. Keep version maps, release notes,
-and data licensing decisions in `specs/`.
+This is a public research dashboard, not trading advice. AI chooses the
+pressure state and bottoming state independently from the fixed v0.4
+vocabularies after machine data-readiness checks; the machine must not provide
+an allowed-state subset, score, or combined stage. AI must not alter
+thresholds or give price, position, leverage, or timing advice. Keep version
+maps, release notes, and data licensing decisions in `specs/`.

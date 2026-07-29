@@ -32,6 +32,7 @@ sys.path.insert(0, str(ROOT))
 from services.ai import provider  # noqa: E402
 from services.data import fetch, metrics, packet  # noqa: E402
 from services.evidence.compiler import compile_evidence  # noqa: E402
+from services.evidence.context import build_previous_three_day_context, is_v04_analysis  # noqa: E402
 
 
 DEFAULT_PACKET_PATH = ROOT / "dashboard" / "public" / "data" / "packet.json"
@@ -48,8 +49,10 @@ def _append_log(log_path: Path, record: dict) -> None:
 
 
 def _archive_previous(packet_path: Path, archive_dir: Path, keep: int) -> None:
-    previous = packet.load_packet(packet_path)
-    if not previous:
+    if not packet_path.exists():
+        return
+    previous = _load_raw_packet(packet_path)
+    if not previous or not previous.get("data_date"):
         return
     archive_dir.mkdir(parents=True, exist_ok=True)
     archive_file = archive_dir / f"{previous['data_date']}.json"
@@ -57,6 +60,40 @@ def _archive_previous(packet_path: Path, archive_dir: Path, keep: int) -> None:
     archives = sorted(archive_dir.glob("*.json"), reverse=True)
     for stale_archive in archives[keep:]:
         stale_archive.unlink(missing_ok=True)
+
+
+def _load_raw_packet(path: Path) -> dict | None:
+    if not path.exists():
+        return None
+    try:
+        value = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+    return value if isinstance(value, dict) else None
+
+
+def _previous_records(packet_path: Path, archive_dir: Path) -> list[dict]:
+    records: list[dict] = []
+    current = _load_raw_packet(packet_path)
+    if current:
+        records.append(current)
+    for archive in sorted(archive_dir.glob("*.json"), reverse=True):
+        value = _load_raw_packet(archive)
+        if value:
+            records.append(value)
+    return records
+
+
+def _histories_for_computed(computed: metrics.ComputedData) -> dict[str, list[dict[str, object]]]:
+    histories: dict[str, list[dict[str, object]]] = {}
+    for indicator in computed.indicators:
+        display = packet.packet_display.BY_CANONICAL[indicator.id]
+        scale = display.display_scale
+        histories[display.display_id] = [
+            {"date": day.isoformat(), "value": value * scale}
+            for day, value in sorted(indicator.primary.items())
+        ]
+    return histories
 
 
 def run(
@@ -80,7 +117,8 @@ def run(
             "config_version": packet.CONFIG_VERSION,
             "outcome": "skipped",
             "data_date": None,
-            "analysis_stage": None,
+            "pressure_state": None,
+            "bottoming_state": None,
             "reason": reason,
         })
         print(f"[run_daily] SKIPPED run_id={run_id}: {reason}")
@@ -102,36 +140,45 @@ def run(
     if stale_days > max_stale_days:
         return log_skipped(f"数据日期 {data_date} 过期（>{max_stale_days} 天），疑似数据源延迟")
 
-    # 3. AI analysis (None + reason on any failure -> fallback).
+    # 3. Factual evidence + exact previous-three-natural-day context.
     snapshot = packet.build_snapshot(computed)
-    evidence_brief = compile_evidence(snapshot, analysis_date=data_date.isoformat())
-    if evidence_brief["data_quality"]["stage_ready"]:
-        analysis, ai_reason = provider.call_ai(
-            snapshot, data_date=data_date.isoformat(), mock=mock_ai
-        )
-        data_insufficient = False
-    else:
-        analysis = provider.data_insufficient_analysis(
-            data_date.isoformat(), evidence_brief
-        )
-        ai_reason = "数据不足：关键锚不可用，不调用 AI"
-        data_insufficient = True
+    histories = _histories_for_computed(computed)
+    previous_records = _previous_records(packet_path, archive_dir)
+    previous_three_days = build_previous_three_day_context(data_date, previous_records)
+    evidence_brief = compile_evidence(
+        snapshot,
+        analysis_date=data_date.isoformat(),
+        histories=histories,
+        previous_three_days=previous_three_days,
+    )
+    analysis, ai_reason = provider.call_ai(
+        snapshot,
+        data_date=data_date.isoformat(),
+        mock=mock_ai,
+        evidence_brief=evidence_brief,
+        previous_three_days=previous_three_days,
+    )
+    data_insufficient = any(
+        isinstance(item, dict) and not bool(item.get("ready"))
+        for item in evidence_brief.get("axis_readiness", {}).values()
+    )
 
     # 4. Resolve analysis + fallback against the previous success.
-    previous = packet.load_packet(packet_path)
-    prev_analysis = previous.get("analysis") if previous else None
-    prev_fallback = previous.get("fallback") if previous else None
-    prev_last_success = previous["status"]["last_success_date"] if previous else None
+    previous = _load_raw_packet(packet_path)
+    prev_analysis = previous.get("analysis") if previous and is_v04_analysis(previous.get("analysis")) else None
+    prev_fallback = previous.get("fallback") if previous and is_v04_analysis(previous.get("fallback")) else None
+    prev_last_success = previous.get("status", {}).get("last_success_date") if previous else None
     carry_forward = prev_analysis or prev_fallback
 
-    if data_insufficient:
+    if data_insufficient and analysis is not None:
         today_available = True
         new_analysis = analysis
         new_fallback = carry_forward
         last_success_date = prev_last_success
         reason = ai_reason
         outcome = "published-data-insufficient"
-        analysis_stage = analysis.get("stage")
+        pressure_state = analysis.get("pressure_state")
+        bottoming_state = analysis.get("bottoming_state")
     elif analysis is not None:
         today_available = True
         new_analysis = analysis
@@ -139,7 +186,8 @@ def run(
         last_success_date = data_date.isoformat()
         reason = None
         outcome = "published-fresh"
-        analysis_stage = analysis.get("stage")
+        pressure_state = analysis.get("pressure_state")
+        bottoming_state = analysis.get("bottoming_state")
     else:
         today_available = False
         new_analysis = None
@@ -147,7 +195,8 @@ def run(
         last_success_date = prev_last_success
         reason = ai_reason or "AI 分析不可用"
         outcome = "published-fallback"
-        analysis_stage = new_fallback.get("stage") if new_fallback else None
+        pressure_state = new_fallback.get("pressure_state") if new_fallback else None
+        bottoming_state = new_fallback.get("bottoming_state") if new_fallback else None
 
     # 5. Assemble + validate + atomic publish.
     pkt = packet.build_packet(
@@ -159,6 +208,9 @@ def run(
         reason=reason,
         run_id=run_id,
         generated_at=generated_at,
+        histories=histories,
+        previous_records=previous_records,
+        previous_three_days=previous_three_days,
     )
 
     if previous:
@@ -172,13 +224,14 @@ def run(
         "outcome": outcome,
         "data_date": data_date.isoformat(),
         "analysis_date": pkt["analysis_date"],
-        "analysis_stage": analysis_stage,
+        "pressure_state": pressure_state,
+        "bottoming_state": bottoming_state,
         "today_available": today_available,
         "reason": reason,
     })
     print(
         f"[run_daily] {outcome} run_id={run_id} data_date={data_date} "
-        f"stage={analysis_stage} today_available={today_available}"
+        f"pressure={pressure_state} bottoming={bottoming_state} today_available={today_available}"
     )
     return 0
 

@@ -208,7 +208,7 @@ a:focus-visible {
   text-transform: uppercase;
 }
 
-.stage-hero h1 {
+.state-hero h1 {
   max-width: 330px;
   margin: 8px 0 0;
   color: var(--white);
@@ -216,6 +216,86 @@ a:focus-visible {
   font-weight: 500;
   line-height: 0.98;
   letter-spacing: -0.055em;
+}
+
+.dual-state-head {
+  grid-template-columns: minmax(170px, 0.8fr) minmax(170px, 0.8fr) minmax(260px, 1.4fr) 118px;
+}
+
+.state-hero h1 {
+  max-width: 250px;
+  font-size: clamp(27px, 3.2vw, 48px);
+}
+
+.pressure-hero .eyebrow {
+  color: var(--orange);
+}
+
+.bottoming-hero .eyebrow {
+  color: var(--mint);
+}
+
+.dual-axis-summary {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 20px;
+}
+
+.axis-card {
+  padding: 13px 15px 14px;
+  border: 1px solid var(--line-dark);
+  background: rgba(8, 13, 14, 0.38);
+}
+
+.axis-card-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.axis-card-head strong {
+  color: var(--white);
+  font-size: 17px;
+  font-weight: 500;
+}
+
+.axis-card .eyebrow {
+  color: var(--orange);
+}
+
+.dual-axis-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px 12px;
+  margin: 13px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.dual-axis-list li {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--muted-dark);
+  font-size: 10px;
+}
+
+.dual-axis-dot {
+  width: 7px;
+  height: 7px;
+  border: 1px solid currentColor;
+  border-radius: 50%;
+}
+
+.dual-axis-list li.is-current {
+  color: var(--mint);
+}
+
+.dual-axis-list li.is-current .dual-axis-dot {
+  background: currentColor;
+  box-shadow: 0 0 0 3px rgba(155, 192, 184, 0.13);
 }
 
 .evaluation-summary {
@@ -284,94 +364,6 @@ a:focus-visible {
 
 .consistency-pill[data-level="弱"] {
   border-top-color: var(--blue);
-}
-
-.stage-axis-wrap {
-  position: relative;
-  max-width: 1100px;
-  margin: 22px auto 0;
-  padding: 0 24px;
-}
-
-.axis-line {
-  position: absolute;
-  top: 13px;
-  right: 10%;
-  left: 10%;
-  height: 1px;
-  background: #3e4f50;
-}
-
-.axis-line-fill {
-  display: block;
-  height: 100%;
-  background: var(--mint);
-  transition: width 250ms ease;
-}
-
-.stage-axis {
-  position: relative;
-  display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
-  gap: 8px;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.stage-stop {
-  display: grid;
-  justify-items: center;
-  gap: 5px;
-  color: #657471;
-  text-align: center;
-}
-
-.axis-point {
-  width: 27px;
-  height: 27px;
-  display: grid;
-  place-items: center;
-  border: 1px solid #546465;
-  border-radius: 50%;
-  background: var(--ink-soft);
-  color: #80908c;
-  font-family: "Cascadia Mono", Consolas, monospace;
-  font-size: 9px;
-}
-
-.axis-stage {
-  max-width: 140px;
-  color: #768783;
-  font-size: 13px;
-  line-height: 1.25;
-}
-
-.axis-state {
-  color: #657471;
-  font-size: 9px;
-  letter-spacing: 0.05em;
-}
-
-.stage-stop.is-past .axis-point {
-  border-color: var(--mint);
-  color: var(--mint);
-}
-
-.stage-stop.is-past .axis-stage {
-  color: #b1c3bd;
-}
-
-.stage-stop.is-current .axis-point {
-  border-color: var(--orange);
-  background: var(--orange);
-  color: var(--ink);
-  box-shadow: 0 0 0 5px rgba(226, 160, 110, 0.16);
-}
-
-.stage-stop.is-current .axis-stage,
-.stage-stop.is-current .axis-state {
-  color: var(--white);
 }
 
 .summary-blocks {
@@ -1243,6 +1235,7 @@ a:focus-visible {
   }
 
   .evaluation-head,
+  .dual-state-head,
   .summary-blocks,
   .detail-drawer,
   .workbench {
@@ -1254,13 +1247,17 @@ a:focus-visible {
     gap: 14px;
   }
 
-  .stage-hero h1 {
+  .state-hero h1 {
     max-width: 280px;
     font-size: 38px;
   }
 
   .evaluation-summary {
     font-size: 16px;
+  }
+
+  .dual-axis-summary {
+    grid-template-columns: 1fr;
   }
 
   .consistency-pill {
@@ -1277,37 +1274,6 @@ a:focus-visible {
 
   .consistency-pill small {
     margin-left: auto;
-  }
-
-  .stage-axis-wrap {
-    padding: 0;
-    margin-top: 20px;
-  }
-
-  .axis-line {
-    top: 11px;
-    right: 9%;
-    left: 9%;
-  }
-
-  .stage-axis {
-    gap: 1px;
-  }
-
-  .axis-point {
-    width: 22px;
-    height: 22px;
-    font-size: 8px;
-  }
-
-  .axis-stage {
-    max-width: 65px;
-    font-size: 10px;
-    line-height: 1.22;
-  }
-
-  .axis-state {
-    font-size: 8px;
   }
 
   .summary-block {

@@ -121,7 +121,7 @@ function moveFocus(event: KeyboardEvent, index: number) {
         <small>{{ metric.current_date || metric.metric_date || "日期未知" }} · {{ metric.unit }}</small>
       </span>
       <span class="metric-value">{{ metric.display_value }}</span>
-      <span class="metric-tier" :class="tierClass(metric.tier_label)">{{ metric.tier_label }}</span>
+      <span class="metric-tier" :class="tierClass(metric.tier_id, metric.tier_label)">{{ metric.tier_label }}</span>
       <span class="metric-availability" :class="`availability-${availabilityState(metric)}`">{{ availabilityLabel(metric) }}</span>
       <small v-if="availabilityNote(metric)" class="metric-availability-note">{{ availabilityNote(metric) }}</small>
     </button>

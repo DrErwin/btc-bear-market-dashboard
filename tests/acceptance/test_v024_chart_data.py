@@ -41,6 +41,10 @@ DISPLAY_TO_SOURCE = {
     "reserve": "reserve_risk_zscore",
 }
 
+PUBLIC_LABEL_RENAMES = {
+    "10%分位定投区": "10%分位观察区",
+}
+
 
 def _load_config() -> dict:
     assert CONFIG_PATH.exists(), f"缺少指标验证导出：{CONFIG_PATH}"
@@ -71,7 +75,7 @@ def test_packet_reproduces_exported_reference_lines_and_all_timeline_lines() -> 
         ]
 
         assert [(item["value"], item["label"]) for item in entry["thresholds"]] == [
-            (reference["value"] * scale, reference["label"])
+            (reference["value"] * scale, PUBLIC_LABEL_RENAMES.get(reference["label"], reference["label"]))
             for reference in published_references
         ]
         assert [item["direction"] for item in entry["thresholds"]] == [

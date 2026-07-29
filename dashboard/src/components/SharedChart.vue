@@ -452,8 +452,8 @@ onBeforeUnmount(() => {
 
     <div class="chart-facts">
       <div><span>当前值</span><strong>{{ metric.display_value }}</strong></div>
-      <div><span>当前档位</span><strong :class="tierClass(metric.tier_label)">{{ metric.tier_label }}</strong></div>
-      <div><span>证据角色</span><strong :class="metric.role === '核心' ? 'is-core' : 'is-supporting'">{{ metric.role }}</strong></div>
+      <div><span>当前档位</span><strong :class="tierClass(metric.tier_id, metric.tier_label)">{{ metric.tier_label }}</strong></div>
+      <div><span>证据角色</span><strong :class="metric.role === '核心锚' || metric.role === '核心复核' ? 'is-core' : 'is-supporting'">{{ metric.role }}</strong></div>
     </div>
 
     <div v-if="isBarMetric && (hodlerBar || spentBar)" class="bars-meta" aria-label="柱状图口径说明">

@@ -1,4 +1,4 @@
-"""Offline validation for the structured AI analysis response."""
+"""Structural and product-safety validation for v0.4 AI output."""
 
 from __future__ import annotations
 
@@ -7,11 +7,12 @@ from collections.abc import Mapping
 from typing import Any
 
 from .contract import (
-    ALLOWED_STAGES,
+    BOTTOMING_STATES,
     CATEGORY_IDS,
     CATEGORY_STATUS_VALUES,
     CONSISTENCY_VALUES,
-    DATA_INSUFFICIENT_STAGE,
+    DETAIL_SECTION_IDS,
+    PRESSURE_STATES,
 )
 
 
@@ -23,55 +24,22 @@ class InvalidAnalysisError(ValueError):
         super().__init__("AI 分析契约校验失败: " + "；".join(self.errors))
 
 
-_RAW_TOP_LEVEL_KEYS = {
+_TOP_LEVEL_KEYS = {
     "analysis_date",
-    "stage",
+    "pressure_state",
+    "bottoming_state",
     "consistency",
     "summary",
-    "core_support",
-    "main_obstacle",
-    "next_stage_condition",
-    "categories",
-    "supporting_evidence",
-    "contrary_evidence",
-    "next_stage_confirmation",
-    "pressure_summary",
-    "supporting",
-    "contrary",
-    "next_stage",
     "compact",
+    "categories",
     "detailed",
+    "state_changes",
 }
-_COMPACT_KEYS = {"support", "obstacle", "next"}
-_DETAILED_KEYS = {
-    "supporting",
-    "contrary",
-    "next_stage",
-    "supporting_evidence",
-    "contrary_evidence",
-    "next_stage_confirmation",
-    "pressure",
-}
+_COMPACT_KEYS = {"pressure", "bottoming", "change"}
+_DETAILED_KEYS = set(DETAIL_SECTION_IDS)
 _CATEGORY_KEYS = {"id", "category", "status", "note"}
+_CHANGE_KEYS = {"changed", "from", "to", "reason", "compared_date"}
 
-_FORBIDDEN_KEY_PARTS = (
-    "buy",
-    "sell",
-    "entry_price",
-    "entryprice",
-    "position",
-    "leverage",
-    "probability",
-    "confidence_pct",
-    "probability_pct",
-    "bottom_probability",
-    "买",
-    "卖",
-    "入场",
-    "仓位",
-    "杠杆",
-    "概率",
-)
 FORBIDDEN_OUTPUT_TERMS = (
     "买入",
     "建议卖出",
@@ -83,7 +51,6 @@ FORBIDDEN_OUTPUT_TERMS = (
     "抄底",
     "入场",
     "入场价",
-    "入场价格",
     "仓位",
     "持仓",
     "杠杆",
@@ -95,8 +62,6 @@ FORBIDDEN_OUTPUT_TERMS = (
     "leverage",
     "probability",
     "confidence",
-    "confidence_pct",
-    "position",
     "position size",
     "entry price",
 )
@@ -107,272 +72,166 @@ INTERNAL_OUTPUT_TERMS = (
     "辅助票",
     "允许阶段",
     "阶段上限",
-    "抬高阶段",
-    "替代核心",
-    "增加一票",
-    "独立投票",
     "allowed_stages",
     "triggered",
     "evidence_use",
     "机器规定",
     "系统不允许",
+    "独立投票",
+    "投票数",
+    "评分",
+    "加权总分",
 )
-_FORBIDDEN_TEXT_RE = re.compile(
+
+_ADVICE_RE = re.compile(
     r"买入|买卖|做多|做空|抄底|入场(?:价|价格)?|仓位|持仓|杠杆|概率|"
-    r"(?<!亏损)卖出|"
-    r"(?:建议|应该|可以|适合|考虑|立即|现在|逢高|逢低|止损|止盈).{0,8}亏损卖出|"
-    r"卖出建议|"
-    r"\b(?:buy|sell|long|short|leverage|probability|confidence_pct|position(?:\s+size)?|entry\s+price)\b",
+    r"(?:建议|应该|可以|适合|考虑|立即|现在|逢高|逢低|止损|止盈).{0,10}(?:卖出|买入|增持|减持)|"
+    r"\b(?:buy|sell|long|short|leverage|probability|confidence|position(?:\s+size)?|entry\s+price)\b",
     re.IGNORECASE,
 )
-_INTERNAL_TEXT_RE = re.compile(
-    "|".join(re.escape(term) for term in INTERNAL_OUTPUT_TERMS),
-    re.IGNORECASE,
-)
-_NUMERIC_PROBABILITY_RE = re.compile(
-    r"(?:\d+(?:\.\d+)?\s*%?\s*(?:的\s*)?(?:概率|probability|confidence)|"
-    r"(?:概率|probability|confidence)\s*(?:为|是|约为|:|：|=)?\s*\d+(?:\.\d+)?\s*%?)",
-    re.IGNORECASE,
-)
+_INTERNAL_RE = re.compile("|".join(re.escape(term) for term in INTERNAL_OUTPUT_TERMS), re.IGNORECASE)
+
+
+def _text(value: object) -> bool:
+    return isinstance(value, str) and bool(value.strip())
 
 
 def _scan_forbidden(value: object, path: str, errors: list[str]) -> None:
     if isinstance(value, Mapping):
         for key, child in value.items():
             key_text = str(key).casefold()
-            if any(part in key_text for part in _FORBIDDEN_KEY_PARTS):
+            if any(part in key_text for part in ("probability", "confidence", "position", "leverage", "entry_price", "allowed_stage", "stage")):
                 errors.append(f"{path}.{key} 是禁止字段")
             _scan_forbidden(child, f"{path}.{key}", errors)
     elif isinstance(value, list):
         for index, child in enumerate(value):
             _scan_forbidden(child, f"{path}[{index}]", errors)
     elif isinstance(value, str):
-        matches = [
-            match.group(0)
-            for pattern in (
-                _FORBIDDEN_TEXT_RE,
-                _NUMERIC_PROBABILITY_RE,
-                _INTERNAL_TEXT_RE,
-            )
-            if (match := pattern.search(value))
-        ]
-        if matches:
-            terms = "、".join(dict.fromkeys(matches))
-            errors.append(f"{path} 含有禁止措辞：{terms}")
+        if (match := _ADVICE_RE.search(value)):
+            errors.append(f"{path} 含有交易或预测建议措辞：{match.group(0)}")
+        if (match := _INTERNAL_RE.search(value)):
+            errors.append(f"{path} 含有后台规则术语：{match.group(0)}")
 
 
 def _check_container_keys(payload: Mapping[str, Any], errors: list[str]) -> None:
-    unknown_top = set(payload) - _RAW_TOP_LEVEL_KEYS
-    errors.extend(f"未知顶层字段: {key}" for key in sorted(unknown_top))
-
-    compact = payload.get("compact")
-    if compact is not None and isinstance(compact, Mapping):
-        errors.extend(
-            f"未知 compact 字段: {key}"
-            for key in sorted(set(compact) - _COMPACT_KEYS)
-        )
-    detailed = payload.get("detailed")
-    if detailed is not None and isinstance(detailed, Mapping):
-        errors.extend(
-            f"未知 detailed 字段: {key}"
-            for key in sorted(set(detailed) - _DETAILED_KEYS)
-        )
-    categories = payload.get("categories")
-    if isinstance(categories, list):
-        for index, category in enumerate(categories):
-            if isinstance(category, Mapping):
-                errors.extend(
-                    f"categories[{index}] 含未知字段: {key}"
-                    for key in sorted(set(category) - _CATEGORY_KEYS)
-                )
-
-
-def _text_value(value: object) -> bool:
-    if isinstance(value, str):
-        return bool(value.strip())
-    if isinstance(value, Mapping):
-        text = value.get("text")
-        return isinstance(text, str) and bool(text.strip())
-    return False
-
-
-def _normalise_analysis(payload: Mapping[str, Any]) -> dict[str, Any]:
-    """Map the checked dashboard fixture shape to the strict output shape."""
-
-    normalized: dict[str, Any] = {}
-    for key in (
-        "analysis_date",
-        "stage",
-        "consistency",
-        "summary",
-        "core_support",
-        "main_obstacle",
-        "next_stage_condition",
-        "supporting_evidence",
-        "contrary_evidence",
-        "next_stage_confirmation",
-        "pressure_summary",
-    ):
-        if key in payload:
-            normalized[key] = payload[key]
-
+    errors.extend(f"未知顶层字段: {key}" for key in sorted(set(payload) - _TOP_LEVEL_KEYS))
     compact = payload.get("compact")
     if isinstance(compact, Mapping):
-        for target, source in (
-            ("core_support", "support"),
-            ("main_obstacle", "obstacle"),
-            ("next_stage_condition", "next"),
-        ):
-            if target not in normalized and source in compact:
-                normalized[target] = compact[source]
-
+        errors.extend(f"未知 compact 字段: {key}" for key in sorted(set(compact) - _COMPACT_KEYS))
     detailed = payload.get("detailed")
     if isinstance(detailed, Mapping):
-        for target, source in (
-            ("supporting_evidence", ("supporting_evidence", "supporting")),
-            ("contrary_evidence", ("contrary_evidence", "contrary")),
-            (
-                "next_stage_confirmation",
-                ("next_stage_confirmation", "next_stage"),
-            ),
-        ):
-            if target not in normalized:
-                for candidate in source:
-                    if candidate in detailed:
-                        normalized[target] = detailed[candidate]
-                        break
-        if "pressure_summary" not in normalized:
-            for candidate in ("pressure_summary", "pressure"):
-                if candidate in detailed:
-                    normalized["pressure_summary"] = detailed[candidate]
-                    break
-
-    for target, aliases in (
-        ("supporting_evidence", ("supporting",)),
-        ("contrary_evidence", ("contrary",)),
-        ("next_stage_confirmation", ("next_stage",)),
-    ):
-        if target not in normalized:
-            for alias in aliases:
-                if alias in payload:
-                    normalized[target] = payload[alias]
-                    break
-
-    raw_categories = payload.get("categories")
-    if isinstance(raw_categories, list):
-        normalized_categories: list[Any] = []
-        for item in raw_categories:
+        errors.extend(f"未知 detailed 字段: {key}" for key in sorted(set(detailed) - _DETAILED_KEYS))
+    changes = payload.get("state_changes")
+    if isinstance(changes, Mapping):
+        for axis, change in changes.items():
+            if axis not in {"pressure", "bottoming"} or not isinstance(change, Mapping):
+                errors.append(f"state_changes.{axis} 结构无效")
+            elif set(change) - _CHANGE_KEYS:
+                errors.extend(f"state_changes.{axis} 含未知字段: {key}" for key in sorted(set(change) - _CHANGE_KEYS))
+    categories = payload.get("categories")
+    if isinstance(categories, list):
+        for index, item in enumerate(categories):
             if isinstance(item, Mapping):
-                normalized_categories.append(
-                    {
-                        "category": item.get("category", item.get("id")),
-                        "status": item.get("status"),
-                    }
-                )
-            else:
-                normalized_categories.append(item)
-        normalized["categories"] = normalized_categories
-    elif "categories" in payload:
-        normalized["categories"] = raw_categories
-
-    return normalized
+                errors.extend(f"categories[{index}] 含未知字段: {key}" for key in sorted(set(item) - _CATEGORY_KEYS))
 
 
 def _validate_categories(value: object, errors: list[str]) -> None:
-    if not isinstance(value, list):
-        errors.append("categories 必须是六类列表")
-        return
-    if len(value) != len(CATEGORY_IDS):
+    if not isinstance(value, list) or len(value) != len(CATEGORY_IDS):
         errors.append("categories 必须恰好包含六类")
-
-    seen: list[object] = []
+        return
+    seen: set[str] = set()
     for index, item in enumerate(value):
         if not isinstance(item, Mapping):
             errors.append(f"categories[{index}] 必须是对象")
             continue
-        category = item.get("category")
+        category = item.get("id", item.get("category"))
         status = item.get("status")
         if category not in CATEGORY_IDS:
             errors.append(f"categories[{index}] 使用未知类别: {category}")
         elif category in seen:
             errors.append(f"categories 出现重复类别: {category}")
         else:
-            seen.append(category)
+            seen.add(str(category))
         if status not in CATEGORY_STATUS_VALUES:
             errors.append(f"categories[{index}] 使用未知状态: {status}")
-
-    if set(seen) != set(CATEGORY_IDS):
+        if "note" in item and not _text(item.get("note")):
+            errors.append(f"categories[{index}].note 必须是非空文本")
+    if seen != set(CATEGORY_IDS):
         errors.append("categories 未覆盖全部六个固定类别")
 
 
-def validate_analysis(
-    payload: Mapping[str, Any],
-    *,
-    allowed_stages: list[str] | tuple[str, ...] | None = None,
-    require_pressure_summary: bool = False,
-) -> dict[str, Any]:
-    """Validate and return a canonical analysis, or raise ``InvalidAnalysisError``."""
+def validate_analysis(payload: Mapping[str, Any]) -> dict[str, Any]:
+    """Validate and return a v0.4 analysis."""
 
     errors: list[str] = []
     if not isinstance(payload, Mapping):
         raise InvalidAnalysisError("AI 输出必须是 JSON 对象")
-
     _scan_forbidden(payload, "$", errors)
     _check_container_keys(payload, errors)
-    normalized = _normalise_analysis(payload)
-
-    required = (
-        "stage",
+    for field in (
+        "analysis_date",
         "summary",
-        "core_support",
-        "main_obstacle",
-        "next_stage_condition",
+        "pressure_state",
+        "bottoming_state",
+        "compact",
+        "detailed",
         "categories",
-        "supporting_evidence",
-        "contrary_evidence",
-        "next_stage_confirmation",
-    )
-    for field in required:
-        if field not in normalized:
+        "state_changes",
+    ):
+        if field not in payload:
             errors.append(f"缺少必填字段: {field}")
-
-    stage = normalized.get("stage")
-    if stage not in ALLOWED_STAGES:
-        errors.append(f"未知 stage: {stage}")
-    if allowed_stages is not None and stage not in allowed_stages:
-        errors.append(f"stage 超出机器允许范围: {stage}；允许范围={list(allowed_stages)}")
-
-    consistency = normalized.get("consistency")
-    if stage != DATA_INSUFFICIENT_STAGE and "consistency" not in normalized:
-        errors.append("缺少必填字段: consistency")
-    elif consistency is not None and consistency not in CONSISTENCY_VALUES:
-        errors.append(f"未知 consistency: {consistency}")
-
-    if "summary" in normalized and not _text_value(normalized["summary"]):
+    if payload.get("pressure_state") not in PRESSURE_STATES:
+        errors.append(f"未知 pressure_state: {payload.get('pressure_state')}")
+    if payload.get("bottoming_state") not in BOTTOMING_STATES:
+        errors.append(f"未知 bottoming_state: {payload.get('bottoming_state')}")
+    pressure_insufficient = payload.get("pressure_state") == "数据不足"
+    bottoming_insufficient = payload.get("bottoming_state") == "数据不足"
+    consistency = payload.get("consistency")
+    if pressure_insufficient and bottoming_insufficient:
+        if consistency is not None:
+            errors.append("两条轴都数据不足时 consistency 必须为空")
+    elif consistency not in CONSISTENCY_VALUES:
+        errors.append(f"未知或缺少 consistency: {consistency}")
+    if not _text(payload.get("analysis_date")):
+        errors.append("analysis_date 必须是非空文本")
+    if not _text(payload.get("summary")):
         errors.append("summary 必须是非空文本")
-    for field in (
-        "core_support",
-        "main_obstacle",
-        "next_stage_condition",
-    ):
-        if field in normalized and not _text_value(normalized[field]):
-            errors.append(f"{field} 必须是非空文本或含 text 的摘要对象")
-    for field in (
-        "supporting_evidence",
-        "contrary_evidence",
-        "next_stage_confirmation",
-    ):
-        if field in normalized and not _text_value(normalized[field]):
-            errors.append(f"{field} 必须是非空文本")
-    if require_pressure_summary and not _text_value(normalized.get("pressure_summary")):
-        errors.append("存在强辅助证据时必须填写 pressure_summary")
 
-    if "categories" in normalized:
-        _validate_categories(normalized["categories"], errors)
+    compact = payload.get("compact")
+    if not isinstance(compact, Mapping):
+        errors.append("compact 必须是对象")
+    else:
+        for key in _COMPACT_KEYS:
+            item = compact.get(key)
+            if not isinstance(item, Mapping) or not _text(item.get("title")) or not _text(item.get("text")):
+                errors.append(f"compact.{key} 必须包含 title 与 text")
+
+    detailed = payload.get("detailed")
+    if not isinstance(detailed, Mapping):
+        errors.append("detailed 必须是对象")
+    else:
+        for section in DETAIL_SECTION_IDS:
+            if not _text(detailed.get(section)):
+                errors.append(f"detailed 缺少必填部分: {section}")
+    _validate_categories(payload.get("categories"), errors)
+
+    changes = payload.get("state_changes")
+    if not isinstance(changes, Mapping):
+        errors.append("state_changes 必须是对象")
+    else:
+        for axis in ("pressure", "bottoming"):
+            change = changes.get(axis)
+            if not isinstance(change, Mapping):
+                errors.append(f"state_changes.{axis} 必须是对象")
+            elif not isinstance(change.get("changed"), bool) or not _text(change.get("reason")):
+                errors.append(f"state_changes.{axis} 必须包含 changed 与 reason")
 
     if errors:
         raise InvalidAnalysisError(errors)
-    return normalized
+    return dict(payload)
 
 
 validate = validate_analysis
+
+
+__all__ = ["InvalidAnalysisError", "validate_analysis", "validate", "FORBIDDEN_OUTPUT_TERMS", "INTERNAL_OUTPUT_TERMS"]
