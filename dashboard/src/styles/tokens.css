@@ -249,48 +249,70 @@ a:focus-visible {
 }
 
 .axis-card-head {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 16px;
+  margin-bottom: 17px;
 }
 
-.axis-card-head strong {
-  color: var(--white);
-  font-size: 17px;
-  font-weight: 500;
-}
-
-.axis-card .eyebrow {
+.pressure-axis-card .eyebrow {
   color: var(--orange);
 }
 
+.bottoming-axis-card .eyebrow {
+  color: var(--mint);
+}
+
 .dual-axis-list {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 7px 12px;
-  margin: 13px 0 0;
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 0;
+  margin: 0;
   padding: 0;
   list-style: none;
 }
 
+.axis-track-bottoming {
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+}
+
+.dual-axis-list::before {
+  content: "";
+  position: absolute;
+  top: 5px;
+  left: 8%;
+  right: 8%;
+  height: 1px;
+  background: var(--line-dark);
+}
+
 .dual-axis-list li {
-  display: inline-flex;
+  position: relative;
+  z-index: 1;
+  display: grid;
+  justify-items: center;
+  gap: 8px;
   align-items: center;
-  gap: 5px;
+  min-width: 0;
   color: var(--muted-dark);
   font-size: 10px;
+  line-height: 1.35;
+  text-align: center;
 }
 
 .dual-axis-dot {
-  width: 7px;
-  height: 7px;
+  width: 10px;
+  height: 10px;
+  background: var(--ink);
   border: 1px solid currentColor;
   border-radius: 50%;
 }
 
+.axis-state-label {
+  max-width: 8em;
+}
+
 .dual-axis-list li.is-current {
   color: var(--mint);
+  font-weight: 600;
 }
 
 .dual-axis-list li.is-current .dual-axis-dot {

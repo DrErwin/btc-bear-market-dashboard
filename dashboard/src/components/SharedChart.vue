@@ -456,18 +456,6 @@ onBeforeUnmount(() => {
       <div><span>证据角色</span><strong :class="metric.role === '核心锚' || metric.role === '核心复核' ? 'is-core' : 'is-supporting'">{{ metric.role }}</strong></div>
     </div>
 
-    <div v-if="isBarMetric && (hodlerBar || spentBar)" class="bars-meta" aria-label="柱状图口径说明">
-      <article v-if="hodlerBar">
-        <span class="bars-tag">柱状系列</span>
-        <strong>{{ hodlerBar.label }}</strong>
-        <p class="bars-caveat">{{ hodlerBar.description }} 来源：{{ hodlerBar.source }}。{{ hodlerBar.caveat }} 缺失日期不补齐；非低估期与零分母记为不可判定。</p>
-      </article>
-      <article v-if="spentBar">
-        <span class="bars-tag">柱状系列</span>
-        <strong>{{ spentBar.label }}</strong>
-        <p class="bars-caveat">{{ spentBar.description }} 来源：{{ spentBar.source }}。{{ spentBar.caveat }} 缺失日期不补齐；非低估期与零分母记为不可判定。</p>
-      </article>
-    </div>
   </section>
 </template>
 
@@ -549,37 +537,6 @@ onBeforeUnmount(() => {
   height: 16px;
   background: #2c3a39;
   margin: 0 4px;
-}
-.bars-meta {
-  display: grid;
-  gap: 8px;
-  margin-top: 12px;
-  padding-top: 12px;
-  border-top: 1px solid #29383a;
-}
-.bars-meta article {
-  background: #131c1d;
-  border: 1px solid #243233;
-  border-radius: 8px;
-  padding: 8px 10px;
-}
-.bars-tag {
-  font-size: 10px;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: #6f8280;
-  display: block;
-  margin-bottom: 2px;
-}
-.bars-meta strong {
-  color: #d6e0dc;
-  font-size: 13px;
-}
-.bars-caveat {
-  margin: 4px 0 0;
-  font-size: 11px;
-  line-height: 1.5;
-  color: #93a3a0;
 }
 .legend-swatch {
   display: inline-block;

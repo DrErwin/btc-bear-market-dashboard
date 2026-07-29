@@ -77,6 +77,9 @@ function availabilityLabel(metric: Metric) {
 
 function availabilityNote(metric: Metric) {
   const state = availabilityState(metric);
+  // “仅供展示” already communicates the boundary. Do not repeat a stale
+  // day-count warning for the two historical holder series.
+  if (state === "display_only" && typeof metric.days_stale === "number" && metric.days_stale > 0) return "";
   if (state === "current" && metric.judgment_eligible !== false) return "";
   const parts: string[] = [];
   if (typeof metric.days_stale === "number" && metric.days_stale > 0) {

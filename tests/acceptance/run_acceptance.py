@@ -82,6 +82,14 @@ def _browser_checks() -> None:
             assert "压力尚未明显" in body or "进入观察" in body or "深度压力" in body or "极端压力" in body or "数据不足" in body
             assert any(state in body for state in ("未见筑底结构", "筑底线索出现", "筑底证据聚合", "筑底证据较完整", "市场修复中", "已离开底部窗口", "数据不足"))
             assert page.locator(".dual-axis-summary").count() == 1
+            assert page.locator(".axis-track-pressure li").count() == 5
+            assert page.locator(".axis-track-bottoming li").count() == 7
+            assert page.locator(".axis-track-pressure .is-current").count() == 1
+            assert page.locator(".axis-track-bottoming .is-current").count() == 1
+            assert page.locator("#pressure-axis-title").inner_text() == "压力轴"
+            assert page.locator("#bottoming-axis-title").inner_text() == "筑底过程轴"
+            assert page.locator(".axis-card strong").count() == 0
+            assert page.locator(".bars-meta").count() == 0
             assert page.locator(".stage-axis").count() == 0
             assert page.get_by_role("button", name="查看完整分析").count() == 1
             page.get_by_role("button", name="查看完整分析").click()
@@ -90,6 +98,15 @@ def _browser_checks() -> None:
             for forbidden in ("定投", "抄底", "大力抄底", "允许阶段", "阶段上限", "allowed_stages"):
                 assert forbidden not in body
             page.screenshot(path=str(EVIDENCE / "success-desktop.png"), full_page=True)
+
+            stale_page = browser.new_page(viewport={"width": 1440, "height": 900})
+            stale_page.goto(f"{base_url}/?fixture=success", wait_until="networkidle")
+            holders = stale_page.get_by_role("button", name="持有者行为与投降，部分确认")
+            assert holders.count() == 1
+            holders.click()
+            assert stale_page.locator("#metric-hodler .metric-availability-note").count() == 0
+            assert stale_page.locator("#metric-spent155 .metric-availability-note").count() == 0
+            stale_page.close()
 
             keyboard = browser.new_page(viewport={"width": 1440, "height": 900})
             keyboard.goto(f"{base_url}/?fixture=success", wait_until="networkidle")

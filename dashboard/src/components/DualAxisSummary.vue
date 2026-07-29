@@ -12,27 +12,35 @@ const bottomingStates: BottomingState[] = ["未见筑底结构", "筑底线索�
 
 <template>
   <div class="dual-axis-summary" aria-label="双轴市场状态">
-    <section class="axis-card" aria-labelledby="pressure-axis-title">
+    <section class="axis-card pressure-axis-card" aria-labelledby="pressure-axis-title">
       <div class="axis-card-head">
-        <span class="eyebrow">压力轴</span>
-        <strong id="pressure-axis-title">{{ pressureState ?? "暂不可用" }}</strong>
+        <span id="pressure-axis-title" class="eyebrow">压力轴</span>
       </div>
-      <ol class="dual-axis-list">
-        <li v-for="state in pressureStates" :key="state" :class="{ 'is-current': state === pressureState }">
+      <ol class="dual-axis-list axis-track-pressure" aria-label="压力轴状态">
+        <li
+          v-for="state in pressureStates"
+          :key="state"
+          :class="{ 'is-current': state === pressureState }"
+          :aria-current="state === pressureState ? 'step' : undefined"
+        >
           <span class="dual-axis-dot" aria-hidden="true"></span>
-          <span>{{ state }}</span>
+          <span class="axis-state-label">{{ state }}</span>
         </li>
       </ol>
     </section>
-    <section class="axis-card" aria-labelledby="bottoming-axis-title">
+    <section class="axis-card bottoming-axis-card" aria-labelledby="bottoming-axis-title">
       <div class="axis-card-head">
-        <span class="eyebrow">筑底过程轴</span>
-        <strong id="bottoming-axis-title">{{ bottomingState ?? "暂不可用" }}</strong>
+        <span id="bottoming-axis-title" class="eyebrow">筑底过程轴</span>
       </div>
-      <ol class="dual-axis-list">
-        <li v-for="state in bottomingStates" :key="state" :class="{ 'is-current': state === bottomingState }">
+      <ol class="dual-axis-list axis-track-bottoming" aria-label="筑底过程轴状态">
+        <li
+          v-for="state in bottomingStates"
+          :key="state"
+          :class="{ 'is-current': state === bottomingState }"
+          :aria-current="state === bottomingState ? 'step' : undefined"
+        >
           <span class="dual-axis-dot" aria-hidden="true"></span>
-          <span>{{ state }}</span>
+          <span class="axis-state-label">{{ state }}</span>
         </li>
       </ol>
     </section>
