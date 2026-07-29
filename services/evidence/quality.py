@@ -53,8 +53,6 @@ def _number(value: object) -> float | None:
 
 
 def _initial_status(canonical_id: str) -> tuple[str, str | None]:
-    if canonical_id == "cvdd_proximity":
-        return VALIDATION_PENDING, "CVDD 距离阈值仍在验证，暂不参与当前判断"
     return CURRENT, None
 
 

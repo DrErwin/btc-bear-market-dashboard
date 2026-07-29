@@ -12,12 +12,13 @@ def test_related_supply_metrics_share_one_correlation_family() -> None:
     assert "independent_count" not in family
 
 
-def test_stale_and_pending_metrics_are_visible_but_not_current_support() -> None:
+def test_stale_metrics_are_visible_but_cvdd_is_current_support() -> None:
     brief = compile_evidence(make_snapshot(stale_ids={"hodler", "spent155"}))
     by_id = {item["id"]: item for item in brief["metric_states"]}
     assert by_id["hodler"]["status"] == "display_only"
     assert by_id["spent155"]["judgment_eligible"] is False
-    assert by_id["cvdd"]["status"] == "validation_pending"
+    assert by_id["cvdd"]["status"] == "current"
+    assert by_id["cvdd"]["judgment_eligible"] is True
     assert by_id["hodler"]["triggered"] is None
 
 

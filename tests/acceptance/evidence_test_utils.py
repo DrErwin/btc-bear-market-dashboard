@@ -37,7 +37,7 @@ def _thresholds(metric_id: str) -> list[dict[str, object]]:
             {"value": 0.5, "direction": "below", "label": "深度压力区", "meaning": "深度矿工压力", "tier_id": "deep_pressure"},
         ]
     if metric_id in {"rul-z", "cvdd"}:
-        return [{"value": 2.0 if metric_id == "rul-z" else 0.5, "direction": "above", "label": "观察线", "meaning": "辅助压力", "tier_id": "observation"}]
+        return [{"value": 2.0 if metric_id == "rul-z" else 5.0, "direction": "above", "label": "观察线", "meaning": "辅助压力", "tier_id": "observation"}]
     if metric_id in {"asopr", "seller", "psip", "sipl", "rup", "sth-mvrv"}:
         return [{"value": 1.0 if metric_id in {"asopr", "sth-mvrv"} else 50.0, "direction": "below", "label": "观察线", "meaning": "辅助压力", "tier_id": "observation"}]
     return [{"value": 0.0, "direction": "above", "label": "观察线", "meaning": "辅助信号", "tier_id": "observation"}]

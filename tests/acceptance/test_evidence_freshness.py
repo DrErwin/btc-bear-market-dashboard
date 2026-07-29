@@ -1,15 +1,15 @@
 from __future__ import annotations
 
-from services.evidence.quality import DISPLAY_ONLY, VALIDATION_PENDING, evaluate_snapshot_quality
+from services.evidence.quality import DISPLAY_ONLY, evaluate_snapshot_quality
 from tests.acceptance.evidence_test_utils import clone_snapshot, make_snapshot
 
 
-def test_stale_and_pending_statuses_are_distinct() -> None:
+def test_stale_status_is_distinct_from_current_cvdd() -> None:
     report = evaluate_snapshot_quality(make_snapshot(stale_ids={"hodler", "spent155"}), analysis_date="2026-07-28")
     by_id = {item["id"]: item for item in report["metrics"]}
     assert by_id["hodler"]["status"] == DISPLAY_ONLY
     assert by_id["spent155"]["status"] == DISPLAY_ONLY
-    assert by_id["cvdd"]["status"] == VALIDATION_PENDING
+    assert by_id["cvdd"]["status"] == "current"
     assert report["axis_readiness"]["pressure"]["ready"] is True
 
 

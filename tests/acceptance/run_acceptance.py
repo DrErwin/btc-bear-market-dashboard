@@ -108,6 +108,15 @@ def _browser_checks() -> None:
             assert stale_page.locator("#metric-spent155 .metric-availability-note").count() == 0
             stale_page.close()
 
+            cvdd_page = browser.new_page(viewport={"width": 1440, "height": 900})
+            cvdd_page.goto(f"{base_url}/?fixture=success", wait_until="networkidle")
+            anchors = cvdd_page.get_by_role("button", name="长期成本锚与持币信念，部分确认")
+            assert anchors.count() == 1
+            anchors.click()
+            assert cvdd_page.locator("#metric-cvdd .availability-current").count() == 1
+            assert cvdd_page.locator("#metric-cvdd .metric-availability-note").count() == 0
+            cvdd_page.close()
+
             keyboard = browser.new_page(viewport={"width": 1440, "height": 900})
             keyboard.goto(f"{base_url}/?fixture=success", wait_until="networkidle")
             toggle = keyboard.get_by_role("button", name="查看完整分析")

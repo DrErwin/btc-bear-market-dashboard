@@ -16,7 +16,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 from services.ai import provider  # noqa: E402
-from services.data.packet import validate_packet  # noqa: E402
+from services.data.packet import _decorate_snapshot_with_evidence, validate_packet  # noqa: E402
 from services.data.packet_display import stable_tier_id_for_display  # noqa: E402
 from services.evidence.compiler import compile_evidence  # noqa: E402
 from services.evidence.timeline import classify_tier  # noqa: E402
@@ -70,6 +70,7 @@ def _make_success(old: dict) -> dict:
     snapshot, histories = _upgrade_snapshot(old)
     data_date = str(old["data_date"])
     brief = compile_evidence(snapshot, analysis_date=data_date, histories=histories, previous_three_days=[])
+    _decorate_snapshot_with_evidence(snapshot, brief)
     analysis, reason = provider.call_ai(snapshot, data_date=data_date, mock=True, evidence_brief=brief, previous_three_days=[])
     if analysis is None:
         raise RuntimeError(reason or "mock analysis failed")

@@ -170,7 +170,7 @@ _INDICATOR_DEFINITIONS: Final[tuple[dict[str, object], ...]] = (
         "display_id": "cvdd",
         "label": "CVDD 接近程度",
         "role": "strong_auxiliary",
-        "judgment_status": "validation_pending",
+        "judgment_status": "current",
         "theme_id": "long_term_anchor",
     },
     {
