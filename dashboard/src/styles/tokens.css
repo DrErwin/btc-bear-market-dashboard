@@ -75,7 +75,8 @@ a:focus-visible {
   color: var(--white);
 }
 
-.brand-lockup {
+.brand-lockup,
+.brand-link {
   display: flex;
   align-items: center;
   gap: 13px;
@@ -138,6 +139,39 @@ a:focus-visible {
   gap: 15px;
   color: var(--muted-dark);
   font-size: 11px;
+}
+
+.social-links {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: 2px;
+  padding-left: 12px;
+  border-left: 1px solid rgba(240, 241, 234, 0.18);
+}
+
+.social-link {
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  border: 1px solid rgba(155, 192, 184, 0.38);
+  color: var(--muted-dark);
+  transition: border-color 160ms ease, color 160ms ease, background 160ms ease, transform 160ms ease;
+}
+
+.social-link svg {
+  width: 14px;
+  height: 14px;
+  fill: currentColor;
+}
+
+.social-link:hover,
+.social-link:focus-visible {
+  border-color: var(--mint);
+  background: rgba(155, 192, 184, 0.12);
+  color: var(--mint);
+  transform: translateY(-1px);
 }
 
 .data-stamp {
