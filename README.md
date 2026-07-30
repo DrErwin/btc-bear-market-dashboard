@@ -1,25 +1,38 @@
 # BTC 熊底证据看板
 
-公开、只读的研究型看板：把 16 个 BTC 周期指标整理成证据，展示当前市场压力、熊底证据形成过程、证据一致性、阈值位置、共享图表与持有者卖出柱状图。它不预测确切最低点，也不提供交易建议。
+公开、只读的 BTC 周期研究看板。它把 16 项链上指标组织成可检查的证据，用两条彼此独立的轴说明当前市场：
 
-> 当前公开界面版本记录：`v0.2.4`；系统每天北京时间 12:00 自动尝试更新。2026-07-29 现场核对公开 `packet.json` 时，线上数据契约仍为 `schema/config 0.2.0`，因此“界面版本”和“数据契约版本”不能混为一谈。
->
-> 当前本地实现基线：`v0.4.0`，运行包 `schema/config 0.4.0`。本版本把市场状态拆成“压力轴”和“筑底轴”，允许两条轴分别处于不同阶段；保留人工校准的观察／深度压力／极端压力档位，但不把它们组合成交易动作或单一总阶段。本地实现已提交并通过自动验收；公开部署仍以线上核验记录为准，尚未因本次变更自动发布。
+- **压力轴**：市场压力是否已进入观察、深度或极端状态；
+- **筑底过程轴**：熊底相关线索正在出现、聚合、修复，还是已经离开底部窗口。
+
+它不预测精确最低点，也不提供买卖、仓位、杠杆或价格建议。
+
+> [!IMPORTANT]
+> 当前开发版本为 **v0.4.1**。本次 README 已单独发布；v0.4.1 代码和数据包会在后续独立提交中发布。公开部署版本仍以线上页面为准。
 
 ## 在线访问
 
-公开地址：[btc-bear-market-dashboard.erwinwu000.workers.dev](https://btc-bear-market-dashboard.erwinwu000.workers.dev/)
+[打开公开看板](https://btc-bear-market-dashboard.erwinwu000.workers.dev/)
 
-网页部署在 Cloudflare Workers Static Assets。GitHub 每日任务生成完整数据包并推送后，Cloudflare 自动重建同一公开地址。
+网页部署在 Cloudflare Workers Static Assets。每日任务在获取数据、生成指标和校验分析后，才原子更新完整数据包。
 
-## v0.2.0 能力
+## v0.4.1 开发内容
 
-- **完整数据包 + AI 解释回退**：页面只读一份 `packet.json`；AI 失败时保留本次数据，并明确标记今日 AI 不可用，页面显示上一份成功解释。
-- **图表时间轴与交互缩放**：6 月 / 1 年 / 2 年 / 4 年 / 全量预设、滚轮缩放、拖动平移、纵坐标随可视范围自动适配。
-- **HODLer 投降 + ≥155d 花费价值柱状图**：主图下方两个独立柱状系列，与主图共享同一时间窗口。
-- **每日自动更新**：GitHub Actions 每天北京时间 12:00 抓取公开链上数据 → 派生 16 指标 → GLM-5.2 深度分析 → 合规校验 → 原子发布；密钥只存 GitHub Secrets。
+- **中英文界面**：默认中文，可切换 English；选择会保存在浏览器中，不影响已选择的分类、指标或图表范围。
+- **普通人可读的指标说明**：16 项指标均提供中英文的“指标公式 / 指标含义 / 指标使用”三栏说明，来源链接独立展示在下方。
+- **英文 AI 解读**：每日先完成并校验中文分析，再用同一 AI 服务翻译读者可见文本。翻译不能改动日期、双轴状态、类别状态或近三日变化事实；失败时英文页会明确提示不可用。
+- **保持判断边界**：观察、深度压力、极端压力等人工校准阈值，以及双轴市场状态逻辑均不因双语展示而改变。
 
-详见 [实现记录](specs/v0.2.0/implementation-record.md)与[验收记录](specs/v0.2.0/acceptance-record.md)。
+> [!NOTE]
+> 英文 AI 解读需要每日运行环境配置 `AI_API_KEY`。本地 `--mock-ai` 只用于稳定测试，不能当作真实 AI 调用。
+
+## 看板如何阅读
+
+1. 先看压力轴和筑底过程轴：深度压力不等于已经筑底。
+2. 再看六个证据分类是否有不同维度的支持，而非机械累加相似指标。
+3. 最后选择单个指标，对照当前值、阈值、数据日期、公式、含义和使用限制。
+
+数据过期、缺失或仅供展示的指标会保留在页面中，但不参与当天的市场状态判断。
 
 ## 本地运行
 
@@ -33,33 +46,40 @@ npm run dev
 
 浏览器打开 `http://127.0.0.1:4173/`。
 
-生成真实数据包（Python，stdlib-only，无需额外依赖）：
-
-```powershell
-python services/run_daily.py --mock-ai
-```
-
-`--mock-ai` 用固定合规分析（无需 AI key）；配置 `AI_API_KEY` / `AI_BASE_URL` / `AI_MODEL` 环境变量后去掉该参数即调用真实 AI。
-
-## 构建网页
+构建生产网页：
 
 ```powershell
 cd dashboard
 npm run build
 ```
 
-构建后静态网页位于 `dashboard/dist/`，可部署到任意静态托管。Cloudflare 会在 git push 后自动重建部署。
+生成可重复的本地测试数据包：
 
-页面状态可通过 URL 切换（验收用）：
+```powershell
+python services/run_daily.py --mock-ai
+```
 
-- `?fixture=success`：今日成功分析（默认）
-- `?fixture=failure`：今日失败，展示上一份成功回退
-- `?fixture=no-fallback`：今日失败且没有上一份成功结果
+配置 `AI_API_KEY`（可选 `AI_BASE_URL`、`AI_MODEL`）后，去掉 `--mock-ai`，每日任务才会执行真实中文分析与英文翻译。
 
-## 数据与口径
+## 验证
 
-指标派生、动态阈值方法与 log+4 年 z-score 跨周期归一化在 `services/data/`；证据职责、相关性家族、数据质量、时间线和前三个自然日上下文在 `services/evidence/`；双轴词汇表、AI 输入白名单与输出校验在 `services/ai/`。每日结果包是页面和 AI 共同读取的事实边界，AI 负责在有限框架内综合解释，不接收完整历史序列，也不能修改阈值。
+```powershell
+python tests/acceptance/run_acceptance.py
+```
 
-本地 0.4.0 的统一验收入口为 `python tests/acceptance/run_acceptance.py`，它会运行 Python 契约测试、前端构建和 success／fallback／no-fallback／移动端浏览器场景。版本关系见 [版本文档索引](specs/README.md)，指标定义与可实现性见 [v0.1.0 指标研究](specs/v0.1.0/bear-market-indicator-expandability-research.md)。
+该入口会构建前端、运行数据包和 AI 契约测试，并检查成功、回退、数据不足、中英文切换、指标说明和窄屏页面。
+
+## 项目结构
+
+| 路径 | 作用 |
+| --- | --- |
+| `dashboard/` | Vue 前端、图表与静态数据包 |
+| `services/data/` | 指标派生、阈值和数据包组装 |
+| `services/evidence/` | 证据职责、相关性、数据质量与时间线 |
+| `services/ai/` | AI 输入、中文分析、英文翻译与安全校验 |
+| `tests/acceptance/` | 数据契约和浏览器验收 |
+| `specs/` | 版本需求与完成记录 |
+
+本地工作区的 `specs/` 目录保留版本需求与完成状态；公开仓库只展示已单独提交的网页文件与 README。
 
 仅作公开研究参考 · 不构成交易建议。
