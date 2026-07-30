@@ -99,3 +99,11 @@ def test_daily_prompt_lists_every_allowed_category_status(validation_feedback: s
     prompt = provider._user_prompt({}, "2026-07-30", validation_feedback)
     assert "分类状态只能从" in prompt
     assert all(status in prompt for status in CATEGORY_STATUS_VALUES)
+
+
+@pytest.mark.parametrize("validation_feedback", [None, "支持文字引用了未触发指标 MVRV"])
+def test_daily_prompt_limits_support_to_triggered_evidence(validation_feedback: str | None) -> None:
+    prompt = provider._user_prompt({}, "2026-07-30", validation_feedback)
+    assert "支持证据只能引用已触发指标" in prompt
+    assert "tier.id 不是 none" in prompt
+    assert "triggered 为 true" in prompt

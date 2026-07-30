@@ -59,6 +59,9 @@ def _metric_inputs(snapshot: Mapping[str, Any], brief: Mapping[str, Any]) -> lis
             continue
         metric_id = str(state.get("id") or "")
         raw = raw_by_id.get(metric_id, {})
+        status = str(state.get("status") or "missing")
+        judgment_eligible = bool(state.get("judgment_eligible"))
+        tier_id = str(state.get("tier_id") or "none")
         thresholds = [
             {
                 "value": threshold.get("value"),
@@ -81,19 +84,20 @@ def _metric_inputs(snapshot: Mapping[str, Any], brief: Mapping[str, Any]) -> lis
             "correlation_family": state.get("correlation_family"),
             "value": state.get("current_value") if state.get("status") == "current" else None,
             "date": state.get("metric_date"),
-            "status": state.get("status"),
-            "judgment_eligible": bool(state.get("judgment_eligible")),
+            "status": status,
+            "judgment_eligible": judgment_eligible,
+            "support_eligible": status == "current" and judgment_eligible and tier_id != "none",
             "days_stale": state.get("days_stale"),
             "unavailable_reason": state.get("reason"),
             "tier": {
-                "id": state.get("tier_id") or "none",
+                "id": tier_id,
                 "label": state.get("tier_label") or "未进入观察区",
                 "meaning": state.get("tier_meaning") or "当前值未触及该指标的观察阈值。",
             },
             "thresholds": thresholds,
             "threshold_summary": _threshold_summary(
-                str(state.get("status") or "missing"),
-                str(state.get("tier_id") or "none"),
+                status,
+                tier_id,
                 str(state.get("tier_label") or "未进入观察区"),
                 thresholds,
             ),
@@ -138,6 +142,8 @@ def build_evidence_input(
             "do_not_count_correlated_metrics_as_separate_votes": True,
             "do_not_output_machine_rule_terms": True,
             "do_not_give_trading_advice": True,
+            "support_only_triggered_metrics": True,
+            "untriggered_metrics_only_as_gaps": True,
         },
     }
 

@@ -14,6 +14,8 @@ def test_v04_boundary_replaces_old_single_stage_boundary() -> None:
     assert "allowed_stages" not in request
     assert "pressure_state" not in brief
     assert "bottoming_state" not in brief
+    assert request["instructions"]["support_only_triggered_metrics"] is True
+    assert request["instructions"]["untriggered_metrics_only_as_gaps"] is True
 
 
 def test_missing_metric_is_explicit_and_not_zero() -> None:
@@ -25,6 +27,15 @@ def test_missing_metric_is_explicit_and_not_zero() -> None:
     assert mvrv["value"] is None
     assert mvrv["status"] == "missing"
     assert brief["axis_readiness"]["pressure"]["ready"] is False
+
+
+def test_untriggered_metric_is_explicitly_ineligible_for_support_text() -> None:
+    snapshot = make_snapshot(mvrv=1.2)
+    brief = compile_evidence(snapshot)
+    request = build_evidence_input(snapshot, evidence_brief=brief)
+    mvrv = next(metric for metric in request["metric_states"] if metric["id"] == "mvrv")
+    assert mvrv["tier"]["id"] == "none"
+    assert mvrv["support_eligible"] is False
 
 
 def test_mock_judgement_selects_both_axes_from_fixed_vocabularies() -> None:
