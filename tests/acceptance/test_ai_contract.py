@@ -6,6 +6,8 @@ from pathlib import Path
 
 import pytest
 
+from services.ai import provider
+from services.ai.contract import CATEGORY_STATUS_VALUES
 from services.ai.validator import InvalidAnalysisError, validate_analysis
 
 
@@ -90,3 +92,10 @@ def test_requires_per_axis_state_changes() -> None:
     del payload["state_changes"]
     with pytest.raises(InvalidAnalysisError, match="state_changes"):
         validate_analysis(payload)
+
+
+@pytest.mark.parametrize("validation_feedback", [None, "categories[1] 使用未知状态: 修复中"])
+def test_daily_prompt_lists_every_allowed_category_status(validation_feedback: str | None) -> None:
+    prompt = provider._user_prompt({}, "2026-07-30", validation_feedback)
+    assert "分类状态只能从" in prompt
+    assert all(status in prompt for status in CATEGORY_STATUS_VALUES)

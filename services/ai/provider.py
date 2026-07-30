@@ -10,7 +10,7 @@ from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
 from . import semantic_validator, validator
-from .contract import BOTTOMING_STATES, CATEGORY_IDS, PRESSURE_STATES
+from .contract import BOTTOMING_STATES, CATEGORY_IDS, CATEGORY_STATUS_VALUES, PRESSURE_STATES
 from .input_builder import build_evidence_input
 from services.evidence.compiler import compile_evidence
 from services.evidence.context import state_change_facts
@@ -35,6 +35,7 @@ def _user_prompt(ai_input: dict, data_date: str, validation_feedback: str | None
         f"分析日期：{data_date}。\n"
         f"压力状态只能从：{list(PRESSURE_STATES)} 中选择。\n"
         f"筑底状态只能从：{list(BOTTOMING_STATES)} 中选择。\n"
+        f"六个分类状态只能从：{list(CATEGORY_STATUS_VALUES)} 中选择；不能改写、缩写或使用近义词。\n"
         "只有当两条轴都不是数据不足时，才填写一致性（弱、中等、强）；两条轴都数据不足时填写 null。\n"
         "机器提供的是事实边界，不是答案：不要寻找允许范围，不要把相关家族的多张卡片当成多票，不要把前三天变成投票或晋级规则。\n"
         "压力解释说明当前压力深度；筑底解释说明熊底过程形成到哪一步。需要明确哪些事实支持、哪些相反或缺失、时间线如何变化、修复是否持续、接下来观察什么。\n"
@@ -49,7 +50,7 @@ def _user_prompt(ai_input: dict, data_date: str, validation_feedback: str | None
         '  "consistency": "弱/中等/强 或 null",\n'
         '  "summary": "一句综合结论",\n'
         '  "compact": {"pressure": {"title": "压力", "text": "..."}, "bottoming": {"title": "筑底过程", "text": "..."}, "change": {"title": "近三日变化", "text": "..."}},\n'
-        '  "categories": [{"id": "valuation", "status": "未确认", "note": "..."}],\n'
+        '  "categories": [{"id": "valuation", "status": "未确认/部分确认/充分确认 三选一", "note": "..."}],\n'
         '  "detailed": {"pressure_reason": "...", "bottoming_reason": "...", "evidence_timeline": "...", "contrary_or_gaps": "...", "repair_exit": "...", "next_evidence": "..."},\n'
         '  "state_changes": {"pressure": {"changed": false, "from": null, "to": "...", "reason": "...", "compared_date": null}, "bottoming": {"changed": false, "from": null, "to": "...", "reason": "...", "compared_date": null}}\n'
         "}\n\n"
