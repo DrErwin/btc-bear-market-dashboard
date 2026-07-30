@@ -28,6 +28,17 @@ _SYSTEM_PROMPT = (
 
 
 def _user_prompt(ai_input: dict, data_date: str, validation_feedback: str | None = None) -> str:
+    support_metrics: list[str] = []
+    blocked_metrics: list[str] = []
+    metric_states = ai_input.get("metric_states")
+    if isinstance(metric_states, list):
+        for metric in metric_states:
+            if not isinstance(metric, Mapping):
+                continue
+            metric_id = str(metric.get("id") or "")
+            name = str(metric.get("name") or metric_id)
+            label = f"{metric_id} ({name})" if metric_id and name != metric_id else name
+            (support_metrics if metric.get("support_eligible") is True else blocked_metrics).append(label)
     correction = ""
     if validation_feedback:
         correction = f"\n上一份输出未通过校验，请重写完整 JSON。校验原因：{validation_feedback}。\n"
@@ -36,6 +47,8 @@ def _user_prompt(ai_input: dict, data_date: str, validation_feedback: str | None
         f"压力状态只能从：{list(PRESSURE_STATES)} 中选择。\n"
         f"筑底状态只能从：{list(BOTTOMING_STATES)} 中选择。\n"
         f"六个分类状态只能从：{list(CATEGORY_STATUS_VALUES)} 中选择；不能改写、缩写或使用近义词。\n"
+        f"支持段落指标白名单：{json.dumps(support_metrics, ensure_ascii=False)}。\n"
+        f"支持段落禁用指标：{json.dumps(blocked_metrics, ensure_ascii=False)}；这些名称不得出现在 summary、compact、pressure_reason、bottoming_reason、evidence_timeline 或 repair_exit。\n"
         "支持证据只能引用已触发指标：metric_states 中 support_eligible 为 true，也就是 judgment_eligible 为 true、status 为 current 且 tier.id 不是 none。\n"
         "如果支持文字引用具体阈值或档位，对应 thresholds 项的 triggered 为 true；不能把 triggered 为 false 的阈值方向、档位名称或含义写成当前事实。\n"
         "support_eligible 为 false 的指标只能写入 detailed.contrary_or_gaps 或 detailed.next_evidence，并明确说明未触发、缺失或过期。\n"
@@ -73,7 +86,7 @@ def _chat(ai_input: dict, data_date: str, api_key: str, base_url: str, model: st
         "thinking": {"type": "enabled"},
         "reasoning_effort": "high",
         "max_tokens": 5000,
-        "temperature": 0.2,
+        "temperature": 0,
     }).encode("utf-8")
     request = Request(
         f"{base_url.rstrip('/')}/chat/completions",

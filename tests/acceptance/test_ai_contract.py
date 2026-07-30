@@ -107,3 +107,17 @@ def test_daily_prompt_limits_support_to_triggered_evidence(validation_feedback: 
     assert "支持证据只能引用已触发指标" in prompt
     assert "tier.id 不是 none" in prompt
     assert "triggered 为 true" in prompt
+
+
+def test_daily_prompt_expands_explicit_support_and_blocked_metric_lists() -> None:
+    prompt = provider._user_prompt(
+        {
+            "metric_states": [
+                {"id": "mvrv", "name": "MVRV", "support_eligible": False},
+                {"id": "puell", "name": "Puell Multiple", "support_eligible": True},
+            ]
+        },
+        "2026-07-30",
+    )
+    assert '支持段落指标白名单：["puell (Puell Multiple)"]' in prompt
+    assert '支持段落禁用指标：["mvrv (MVRV)"]' in prompt
