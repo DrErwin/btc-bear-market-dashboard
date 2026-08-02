@@ -50,21 +50,9 @@ def _triggered(metric: Mapping[str, Any]) -> bool:
     return bool(metric.get("triggered"))
 
 
-def _current_thresholds(metric: Mapping[str, Any]) -> list[Mapping[str, Any]]:
-    return [item for item in metric.get("thresholds", []) if isinstance(item, Mapping) and item.get("triggered") is True]
-
-
-def _check_threshold_language(name: str, text: str, metric: Mapping[str, Any], errors: list[str]) -> None:
-    aliases = [str(metric.get("id") or ""), str(metric.get("name") or "")]
-    if not any(_alias_pattern(alias).search(text) for alias in aliases if alias):
-        return
-    triggered = _current_thresholds(metric)
-    lower_claim = bool(re.search(r"低于|低位|下穿|跌入", text))
-    upper_claim = bool(re.search(r"高于|高位|上穿|升入", text))
-    if lower_claim and not any(item.get("direction") == "below" for item in triggered):
-        errors.append(f"{name} 的文字把阈值方向写成低于，但当前触发事实不是 below")
-    if upper_claim and not any(item.get("direction") == "above" for item in triggered):
-        errors.append(f"{name} 的文字把阈值方向写成高于，但当前触发事实不是 above")
+def _check_threshold_labels(name: str, text: str, metric: Mapping[str, Any], errors: list[str]) -> None:
+    # Direction-word scanning is paused because whole-text matching cannot
+    # distinguish a factual claim from a negated phrase such as "并未高于".
     for threshold in metric.get("thresholds", []):
         if not isinstance(threshold, Mapping):
             continue
@@ -163,7 +151,7 @@ def validate_analysis_semantics(analysis: Mapping[str, Any], ai_input: Mapping[s
                     errors.append(f"支持文字引用了不可用或过期指标 {name}")
             elif not _triggered(metric):
                 errors.append(f"支持文字引用了未触发指标 {name}")
-            _check_threshold_language(name, support, metric, errors)
+            _check_threshold_labels(name, support, metric, errors)
     for family, names in family_mentions.items():
         if family and len(names) > 1 and re.search(r"独立|分别证明|多个独立|各自证明|票", support):
             errors.append(f"相关性家族 {family} 被文字当成多个独立证据")

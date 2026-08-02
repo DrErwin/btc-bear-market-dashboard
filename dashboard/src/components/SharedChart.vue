@@ -26,6 +26,7 @@ import {
 import type { BarSeries, BottomMark, Metric, MetricLine, SeriesData } from "../types";
 import { useChartOption, type ZoomRange } from "../composables/useChartOption";
 import { tierClass } from "../utils/tier";
+import { useI18n } from "../i18n";
 
 use([
   CanvasRenderer,
@@ -43,6 +44,7 @@ const props = defineProps<{
   bars: Record<string, BarSeries>;
   bottoms: BottomMark[];
 }>();
+const { locale, t, metric: metricCopy, role, state } = useI18n();
 
 const metricRef = computed(() => props.metric);
 const seriesRef = computed(() => props.series);
@@ -157,26 +159,27 @@ const showHodlerBar = computed(() => props.metric.id === "hodler");
 const showSpentBar = computed(() => props.metric.id === "spent155");
 const isBarMetric = computed(() => showHodlerBar.value || showSpentBar.value);
 const chartAriaLabel = computed(() => {
-  if (showHodlerBar.value) return "BTC 价格、HODLer 柱状图、历史熊底共享图表";
-  if (showSpentBar.value) return "BTC 价格、≥155d 柱状图、历史熊底共享图表";
+  if (showHodlerBar.value) return `${t("btcPrice")}, HODLer bars, ${t("historicalBottoms")}`;
+  if (showSpentBar.value) return `${t("btcPrice")}, ≥155d bars, ${t("historicalBottoms")}`;
   const metricSeries = props.series.metrics[props.metric.id];
   const references = metricSeries?.thresholds.map((threshold) => threshold.label).join("、") || "无";
   const lines = chartLines.value.map((line) => lineDisplayLabel(line)).join("、");
   const thresholdPhrase = hasThresholds.value ? "与阈值线" : "";
-  return `BTC 价格、${props.metric.label}${thresholdPhrase}、历史熊底共享图表；参考线：${references}；曲线：${lines}`;
+  return `${t("btcPrice")}, ${metricCopy(props.metric).label}${thresholdPhrase}, ${t("historicalBottoms")}; ${references}; ${lines}`;
 });
 
 interface RangeOption {
   id: string;
-  label: string;
+  labelZh: string;
+  labelEn: string;
   days: number | null;
 }
 const RANGES: RangeOption[] = [
-  { id: "6m", label: "6 月", days: 182 },
-  { id: "1y", label: "1 年", days: 365 },
-  { id: "2y", label: "2 年", days: 730 },
-  { id: "4y", label: "4 年", days: 1460 },
-  { id: "all", label: "全量", days: null },
+  { id: "6m", labelZh: "6 月", labelEn: "6M", days: 182 },
+  { id: "1y", labelZh: "1 年", labelEn: "1Y", days: 365 },
+  { id: "2y", labelZh: "2 年", labelEn: "2Y", days: 730 },
+  { id: "4y", labelZh: "4 年", labelEn: "4Y", days: 1460 },
+  { id: "all", labelZh: "全量", labelEn: "All", days: null },
 ];
 const activeRange = ref<string>("all");
 
@@ -350,13 +353,13 @@ onBeforeUnmount(() => {
   <section ref="chartCardRef" class="chart-card" aria-labelledby="chart-title">
     <div class="chart-head">
       <div>
-        <h3 id="chart-title">{{ metric.label }}</h3>
+        <h3 id="chart-title">{{ metricCopy(metric).label }}</h3>
       </div>
-      <button class="chart-expand" type="button" aria-label="放大共享图表" @click="fullscreen">放大 <span aria-hidden="true">↗</span></button>
+      <button class="chart-expand" type="button" :aria-label="t('expand')" @click="fullscreen">{{ t("expand") }} <span aria-hidden="true">↗</span></button>
     </div>
 
-    <div class="chart-toolbar" role="group" aria-label="时间范围与坐标">
-      <span class="range-label" aria-live="polite">{{ rangeLabel || "无可用日期" }}</span>
+    <div class="chart-toolbar" role="group" :aria-label="t('chartControls')">
+      <span class="range-label" aria-live="polite">{{ rangeLabel || t("noDate") }}</span>
       <div class="range-buttons">
         <button
           v-for="range in RANGES"
@@ -367,16 +370,16 @@ onBeforeUnmount(() => {
           :aria-pressed="activeRange === range.id"
           @click="applyRange(range)"
         >
-          {{ range.label }}
+          {{ locale === "en" ? range.labelEn : range.labelZh }}
         </button>
         <span class="toolbar-sep" aria-hidden="true"></span>
-        <button type="button" class="range-btn" :class="{ 'is-active': !logPrice }" :aria-pressed="!logPrice" @click="logPrice = false">线性</button>
-        <button type="button" class="range-btn" :class="{ 'is-active': logPrice }" :aria-pressed="logPrice" @click="logPrice = true">对数</button>
+        <button type="button" class="range-btn" :class="{ 'is-active': !logPrice }" :aria-pressed="!logPrice" @click="logPrice = false">{{ t("linear") }}</button>
+        <button type="button" class="range-btn" :class="{ 'is-active': logPrice }" :aria-pressed="logPrice" @click="logPrice = true">{{ t("logarithmic") }}</button>
       </div>
     </div>
 
-    <div class="chart-legend" role="group" aria-label="图例与曲线开关">
-      <button type="button" class="legend-toggle" :class="{ 'is-off': !visibility.price }" :aria-pressed="visibility.price" @click="visibility.price = !visibility.price"><i class="legend-line price"></i>BTC 价格</button>
+    <div class="chart-legend" role="group" :aria-label="t('chartLegend')">
+      <button type="button" class="legend-toggle" :class="{ 'is-off': !visibility.price }" :aria-pressed="visibility.price" @click="visibility.price = !visibility.price"><i class="legend-line price"></i>{{ t("btcPrice") }}</button>
       <template v-if="!isBarMetric">
         <template v-if="hasDedicatedLineControls">
           <button
@@ -393,7 +396,7 @@ onBeforeUnmount(() => {
           </button>
         </template>
         <template v-else>
-          <button v-if="showDefaultIndicatorToggle" type="button" class="legend-toggle" :class="{ 'is-off': !visibility.indicator }" :aria-pressed="visibility.indicator" @click="visibility.indicator = !visibility.indicator"><i class="legend-line indicator"></i>{{ metric.label }}</button>
+          <button v-if="showDefaultIndicatorToggle" type="button" class="legend-toggle" :class="{ 'is-off': !visibility.indicator }" :aria-pressed="visibility.indicator" @click="visibility.indicator = !visibility.indicator"><i class="legend-line indicator"></i>{{ metricCopy(metric).label }}</button>
           <button
             v-for="line in extraChartLines"
             :key="line.id"
@@ -406,9 +409,9 @@ onBeforeUnmount(() => {
             <i class="legend-line extra" :style="{ backgroundColor: lineColor(line) }"></i>{{ lineDisplayLabel(line) }}
           </button>
         </template>
-        <button v-if="hasThresholds" type="button" class="legend-toggle" :class="{ 'is-off': !visibility.thresholds }" :aria-pressed="visibility.thresholds" @click="visibility.thresholds = !visibility.thresholds"><i class="legend-line threshold"></i>阈值线</button>
+        <button v-if="hasThresholds" type="button" class="legend-toggle" :class="{ 'is-off': !visibility.thresholds }" :aria-pressed="visibility.thresholds" @click="visibility.thresholds = !visibility.thresholds"><i class="legend-line threshold"></i>{{ t("thresholds") }}</button>
       </template>
-      <button type="button" class="legend-toggle" :class="{ 'is-off': !visibility.bottoms }" :aria-pressed="visibility.bottoms" @click="visibility.bottoms = !visibility.bottoms"><i class="legend-line bottom"></i>历史熊底</button>
+      <button type="button" class="legend-toggle" :class="{ 'is-off': !visibility.bottoms }" :aria-pressed="visibility.bottoms" @click="visibility.bottoms = !visibility.bottoms"><i class="legend-line bottom"></i>{{ t("historicalBottoms") }}</button>
       <template v-if="isBarMetric">
         <button v-if="showHodlerBar" type="button" class="legend-toggle" :class="{ 'is-off': !visibility.hodler }" :aria-pressed="visibility.hodler" @click="visibility.hodler = !visibility.hodler"><i class="legend-swatch hodler"></i>{{ hodlerBar?.label ?? "HODLer NPC" }}</button>
         <button v-if="showSpentBar" type="button" class="legend-toggle" :class="{ 'is-off': !visibility.spent }" :aria-pressed="visibility.spent" @click="visibility.spent = !visibility.spent"><i class="legend-swatch spent"></i>{{ spentBar?.label ?? "≥155d 花费占比" }}</button>
@@ -416,7 +419,7 @@ onBeforeUnmount(() => {
     </div>
 
     <p v-if="isBarMetric && !hasVisibleBars" class="bars-empty-note" role="status">
-      当前时间范围暂无柱状数据，可切换到全量查看
+      {{ t("barsUnavailable") }}
     </p>
 
     <div
@@ -439,7 +442,7 @@ onBeforeUnmount(() => {
       class="chart-resize-handle"
       role="separator"
       aria-orientation="horizontal"
-      aria-label="调整图表高度"
+      :aria-label="t('resizeChart')"
       :aria-valuemin="MIN_CHART_HEIGHT"
       :aria-valuemax="MAX_CHART_HEIGHT"
       :aria-valuenow="chartHeight"
@@ -451,9 +454,9 @@ onBeforeUnmount(() => {
     </div>
 
     <div class="chart-facts">
-      <div><span>当前值</span><strong>{{ metric.display_value }}</strong></div>
-      <div><span>当前档位</span><strong :class="tierClass(metric.tier_id, metric.tier_label)">{{ metric.tier_label }}</strong></div>
-      <div><span>证据角色</span><strong :class="metric.role === '核心锚' || metric.role === '核心复核' ? 'is-core' : 'is-supporting'">{{ metric.role }}</strong></div>
+      <div><span>{{ t("currentValue") }}</span><strong>{{ metric.display_value }}</strong></div>
+      <div><span>{{ t("currentTier") }}</span><strong :class="tierClass(metric.tier_id, metric.tier_label)">{{ state(metric.tier_label) }}</strong></div>
+      <div><span>{{ t("evidenceRole") }}</span><strong :class="metric.role === '核心锚' || metric.role === '核心复核' ? 'is-core' : 'is-supporting'">{{ role(metric.role) }}</strong></div>
     </div>
 
   </section>

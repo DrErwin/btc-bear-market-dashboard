@@ -167,13 +167,20 @@ def run(
     previous = _load_raw_packet(packet_path)
     prev_analysis = previous.get("analysis") if previous and is_v04_analysis(previous.get("analysis")) else None
     prev_fallback = previous.get("fallback") if previous and is_v04_analysis(previous.get("fallback")) else None
+    prev_analysis_en = previous.get("analysis_en") if previous and is_v04_analysis(previous.get("analysis_en")) else None
+    prev_fallback_en = previous.get("fallback_en") if previous and is_v04_analysis(previous.get("fallback_en")) else None
     prev_last_success = previous.get("status", {}).get("last_success_date") if previous else None
     carry_forward = prev_analysis or prev_fallback
+    carry_forward_en = prev_analysis_en or prev_fallback_en
+
+    english_analysis, english_reason = provider.translate_analysis(analysis, mock=mock_ai) if analysis is not None else (None, None)
 
     if data_insufficient and analysis is not None:
         today_available = True
         new_analysis = analysis
         new_fallback = carry_forward
+        new_analysis_en = english_analysis
+        new_fallback_en = carry_forward_en
         last_success_date = prev_last_success
         reason = ai_reason
         outcome = "published-data-insufficient"
@@ -183,6 +190,8 @@ def run(
         today_available = True
         new_analysis = analysis
         new_fallback = carry_forward
+        new_analysis_en = english_analysis
+        new_fallback_en = carry_forward_en
         last_success_date = data_date.isoformat()
         reason = None
         outcome = "published-fresh"
@@ -192,6 +201,8 @@ def run(
         today_available = False
         new_analysis = None
         new_fallback = carry_forward
+        new_analysis_en = None
+        new_fallback_en = carry_forward_en
         last_success_date = prev_last_success
         reason = ai_reason or "AI 分析不可用"
         outcome = "published-fallback"
@@ -203,9 +214,12 @@ def run(
         computed,
         analysis=new_analysis,
         fallback=new_fallback,
+        analysis_en=new_analysis_en,
+        fallback_en=new_fallback_en,
         today_available=today_available,
         last_success_date=last_success_date,
         reason=reason,
+        english_translation_reason=english_reason,
         run_id=run_id,
         generated_at=generated_at,
         histories=histories,
@@ -228,6 +242,7 @@ def run(
         "bottoming_state": bottoming_state,
         "today_available": today_available,
         "reason": reason,
+        "english_translation_reason": english_reason,
     })
     print(
         f"[run_daily] {outcome} run_id={run_id} data_date={data_date} "

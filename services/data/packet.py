@@ -279,9 +279,12 @@ def build_packet(
     *,
     analysis: dict | None,
     fallback: dict | None,
+    analysis_en: dict | None = None,
+    fallback_en: dict | None = None,
     today_available: bool,
     last_success_date: str | None,
     reason: str | None,
+    english_translation_reason: str | None = None,
     run_id: str,
     generated_at: str,
     histories: dict[str, object] | None = None,
@@ -343,10 +346,16 @@ def build_packet(
         "bottoms": [{"date": day.isoformat(), "label": label} for day, label in BOTTOMS],
         "analysis": shown_analysis,
         "fallback": fallback,
+        "analysis_en": analysis_en if today_available else None,
+        "fallback_en": fallback_en,
         "status": {
             "today_available": today_available,
             "last_success_date": last_success_date,
             "reason": reason,
+            "english_translation": {
+                "available": bool(analysis_en if today_available else fallback_en),
+                "reason": english_translation_reason,
+            },
             "data_insufficient": any(
                 not bool(item.get("ready"))
                 for item in evidence_brief["axis_readiness"].values()
@@ -533,6 +542,36 @@ def validate_packet(packet: dict) -> None:
     # range.
     fallback = packet.get("fallback")
     _validate_analysis_shape(fallback, "fallback", errors)
+    _validate_analysis_shape(packet.get("analysis_en"), "analysis_en", errors)
+    _validate_analysis_shape(packet.get("fallback_en"), "fallback_en", errors)
+    for english_key, chinese_key in (("analysis_en", "analysis"), ("fallback_en", "fallback")):
+        english = packet.get(english_key)
+        chinese = packet.get(chinese_key)
+        if english is not None and chinese is None:
+            errors.append(f"{english_key} 不能在没有对应中文分析时单独存在")
+        if isinstance(english, dict) and isinstance(chinese, dict):
+            for field in ("analysis_date", "pressure_state", "bottoming_state", "consistency"):
+                if english.get(field) != chinese.get(field):
+                    errors.append(f"{english_key}.{field} 必须与 {chinese_key} 一致")
+            english_categories = english.get("categories")
+            chinese_categories = chinese.get("categories")
+            if not isinstance(english_categories, list) or not isinstance(chinese_categories, list) or len(english_categories) != len(chinese_categories):
+                errors.append(f"{english_key}.categories 必须保留对应中文类别结构")
+            else:
+                for index, (english_category, chinese_category) in enumerate(zip(english_categories, chinese_categories)):
+                    if not isinstance(english_category, dict) or not isinstance(chinese_category, dict) or any(
+                        english_category.get(field) != chinese_category.get(field) for field in ("id", "status")
+                    ):
+                        errors.append(f"{english_key}.categories[{index}] 不能改变类别事实")
+            english_changes = english.get("state_changes")
+            chinese_changes = chinese.get("state_changes")
+            for axis in ("pressure", "bottoming"):
+                english_change = english_changes.get(axis) if isinstance(english_changes, dict) else None
+                chinese_change = chinese_changes.get(axis) if isinstance(chinese_changes, dict) else None
+                if not isinstance(english_change, dict) or not isinstance(chinese_change, dict) or any(
+                    english_change.get(field) != chinese_change.get(field) for field in ("changed", "from", "to", "compared_date")
+                ):
+                    errors.append(f"{english_key}.state_changes.{axis} 不能改变状态变化事实")
     for where, payload in (("analysis", analysis), ("fallback", fallback)):
         if payload is not None and not is_v04_analysis(payload):
             errors.append(f"{where} 必须是 v0.4 双轴分析，不能沿用旧单阶段结果")

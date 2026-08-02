@@ -198,6 +198,7 @@ export interface StatusData {
   data_insufficient?: boolean;
   axis_readiness?: Record<"pressure" | "bottoming", AxisReadiness>;
   data_quality?: Record<string, unknown>;
+  english_translation?: { available: boolean; reason: string | null };
 }
 
 export interface Packet {
@@ -230,6 +231,8 @@ export interface Packet {
   bottoms: BottomMark[];
   analysis: Analysis | null;
   fallback: Analysis | null;
+  analysis_en?: Analysis | null;
+  fallback_en?: Analysis | null;
   status: StatusData;
 }
 
@@ -242,6 +245,8 @@ export interface DashboardData {
   analysis: Analysis | null;
   status: StatusData;
   fallback: Analysis | null;
+  analysisEn: Analysis | null;
+  fallbackEn: Analysis | null;
   fixture: string;
   runId: string | null;
   dataDate: string | null;

@@ -34,7 +34,8 @@ def test_mock_daily_analysis_contains_both_axes_and_full_explanation() -> None:
 def test_fallback_is_only_a_complete_v04_analysis() -> None:
     payload = _packet()
     failure = copy.deepcopy(payload)
-    previous = failure["analysis"]
+    previous = failure["analysis"] or failure["fallback"]
+    assert isinstance(previous, dict)
     failure["analysis"] = None
     failure["fallback"] = previous
     failure["status"] = {**failure["status"], "today_available": False, "reason": "模拟 AI 失败"}

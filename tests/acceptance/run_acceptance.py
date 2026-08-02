@@ -17,6 +17,7 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 
 from services.data.packet import validate_packet  # noqa: E402
+from services.ai.provider import call_ai  # noqa: E402
 DASHBOARD = ROOT / "dashboard"
 EVIDENCE = ROOT / "artifacts" / "review-evidence" / "v0.4.0"
 
@@ -38,6 +39,28 @@ def _browser_checks() -> None:
 
     EVIDENCE.mkdir(parents=True, exist_ok=True)
     success_packet = json.loads((DASHBOARD / "public" / "data" / "packet.json").read_text(encoding="utf-8"))
+    analysis, reason = call_ai(
+        success_packet["snapshot"],
+        data_date=success_packet["data_date"],
+        mock=True,
+        evidence_brief=success_packet["evidence_brief"],
+    )
+    assert reason is None and analysis is not None
+    success_packet["analysis"] = analysis
+    success_packet["fallback"] = None
+    success_packet["analysis_en"] = None
+    success_packet["fallback_en"] = None
+    success_packet["analysis_date"] = success_packet["data_date"]
+    success_packet["status"] = {
+        **success_packet["status"],
+        "today_available": True,
+        "last_success_date": success_packet["data_date"],
+        "reason": None,
+        "english_translation": {
+            "available": False,
+            "reason": "固定验收夹具不调用真实英文翻译",
+        },
+    }
 
     def packet_with_readiness(*, pressure_ready: bool, bottoming_ready: bool) -> dict:
         packet = copy.deepcopy(success_packet)
@@ -91,6 +114,8 @@ def _browser_checks() -> None:
             assert page.locator(".axis-card strong").count() == 0
             assert page.locator(".bars-meta").count() == 0
             assert page.locator(".stage-axis").count() == 0
+            assert page.locator(".explanation-grid article").count() == 3
+            assert page.locator(".explanation-source a").count() == 1
             assert page.get_by_role("button", name="查看完整分析").count() == 1
             page.get_by_role("button", name="查看完整分析").click()
             assert page.locator(".detail-drawer article").count() == 6
@@ -101,7 +126,7 @@ def _browser_checks() -> None:
 
             stale_page = browser.new_page(viewport={"width": 1440, "height": 900})
             stale_page.goto(f"{base_url}/?fixture=success", wait_until="networkidle")
-            holders = stale_page.get_by_role("button", name="持有者行为与投降，部分确认")
+            holders = stale_page.get_by_role("button", name="持有者行为 · 部分确认")
             assert holders.count() == 1
             holders.click()
             assert stale_page.locator("#metric-hodler .metric-availability-note").count() == 0
@@ -110,7 +135,7 @@ def _browser_checks() -> None:
 
             cvdd_page = browser.new_page(viewport={"width": 1440, "height": 900})
             cvdd_page.goto(f"{base_url}/?fixture=success", wait_until="networkidle")
-            anchors = cvdd_page.get_by_role("button", name="长期成本锚与持币信念，部分确认")
+            anchors = cvdd_page.get_by_role("button", name="长期成本锚 · 部分确认")
             assert anchors.count() == 1
             anchors.click()
             assert cvdd_page.locator("#metric-cvdd .availability-current").count() == 1
@@ -155,6 +180,20 @@ def _browser_checks() -> None:
             mobile.goto(f"{base_url}/?fixture=success", wait_until="networkidle")
             assert mobile.evaluate("document.documentElement.scrollWidth <= window.innerWidth + 1")
             mobile.screenshot(path=str(EVIDENCE / "success-mobile.png"), full_page=True)
+
+            english = browser.new_page(viewport={"width": 1440, "height": 900})
+            english.goto(f"{base_url}/?fixture=success", wait_until="networkidle")
+            english.get_by_role("button", name="English").click()
+            english.wait_for_timeout(100)
+            english_body = english.locator("body").inner_text()
+            assert "BTC Bear-Bottom Evidence Dashboard" in english_body
+            assert "Formula" in english_body and "How to use it" in english_body
+            assert "English AI analysis is unavailable" in english_body
+            english.reload(wait_until="networkidle")
+            assert "BTC Bear-Bottom Evidence Dashboard" in english.locator("body").inner_text()
+            assert english.evaluate("document.documentElement.scrollWidth <= window.innerWidth + 1")
+            english.get_by_role("button", name="中文").click()
+            english.close()
 
             fallback = browser.new_page(viewport={"width": 1440, "height": 900})
             fallback.goto(f"{base_url}/?fixture=failure", wait_until="networkidle")

@@ -7,6 +7,7 @@ import {
   type ChartVisibility,
 } from "../chartLineControls";
 import type { BarSeries, BottomMark, Metric, MetricLine, MetricSeries, SeriesData } from "../types";
+import { useI18n } from "../i18n";
 
 export type { ChartVisibility } from "../chartLineControls";
 
@@ -55,6 +56,7 @@ export function useChartOption(
   logPrice: Ref<boolean>,
   visibility: Ref<ChartVisibility>,
 ) {
+  const { locale, t } = useI18n();
   return computed(() => {
     const pricePoints = series.value.price;
     const dates = pricePoints.map((point) => point.date);
@@ -160,7 +162,7 @@ export function useChartOption(
     const priceAxis = logPrice.value
       ? {
           type: "log" as const,
-          name: "BTC 价格（对数）",
+          name: `${t("btcPrice")} (${t("logarithmic")})`,
           gridIndex: 0,
           nameTextStyle: { color: "#8fa19e", fontSize: 10 },
           axisLabel: {
@@ -172,7 +174,7 @@ export function useChartOption(
         }
       : {
           type: "value" as const,
-          name: "BTC 价格",
+          name: t("btcPrice"),
           gridIndex: 0,
           min: priceBounds.min,
           max: priceBounds.max,
@@ -207,7 +209,7 @@ export function useChartOption(
           {
             type: "value" as const,
             position: "right" as const,
-            name: activeBarSeries?.unit ?? "占比 %",
+            name: activeBarSeries?.unit ?? (locale.value === "en" ? "Share %" : "占比 %"),
             gridIndex: 0,
             min: activeBarBounds.min,
             max: activeBarBounds.max,
@@ -223,7 +225,7 @@ export function useChartOption(
     // lines remain available even when a bar metric omits its own line.
     const seriesArr: any[] = [
       {
-        name: "BTC 价格",
+        name: t("btcPrice"),
         type: "line",
         xAxisIndex: 0,
         yAxisIndex: 0,

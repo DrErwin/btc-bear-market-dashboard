@@ -6,6 +6,7 @@ import json
 import os
 import re
 from collections.abc import Mapping
+from typing import Any
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
@@ -101,6 +102,142 @@ def _chat(ai_input: dict, data_date: str, api_key: str, base_url: str, model: st
     if not isinstance(parsed, dict):
         raise ValueError("AI 返回不是 JSON 对象")
     return parsed
+
+
+_TRANSLATION_SYSTEM_PROMPT = (
+    "You translate the reader-facing text of a BTC market-evidence dashboard from Chinese to clear English. "
+    "You do not analyse the market again. You do not change any state, date, category id, category status, "
+    "or state-change fact. Do not add trading advice, price forecasts, probabilities, or new facts. "
+    "Return only one JSON object with exactly the supplied structure."
+)
+
+
+def _translation_prompt(analysis: Mapping[str, object]) -> str:
+    return (
+        "Translate only these reader-facing fields into English: summary; compact.*.title and compact.*.text; "
+        "categories.*.note; detailed.*; state_changes.*.reason. Keep analysis_date, pressure_state, "
+        "bottoming_state, consistency, category ids, category statuses, changed, from, to, and compared_date unchanged.\n\n"
+        f"Input JSON:\n{json.dumps(dict(analysis), ensure_ascii=False)}"
+    )
+
+
+def _chat_translation(analysis: Mapping[str, object], api_key: str, base_url: str, model: str) -> dict:
+    body = json.dumps({
+        "model": model,
+        "messages": [
+            {"role": "system", "content": _TRANSLATION_SYSTEM_PROMPT},
+            {"role": "user", "content": _translation_prompt(analysis)},
+        ],
+        "response_format": {"type": "json_object"},
+        "max_tokens": 5000,
+        "temperature": 0,
+    }).encode("utf-8")
+    request = Request(
+        f"{base_url.rstrip('/')}/chat/completions",
+        data=body,
+        headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json", "Accept": "application/json"},
+        method="POST",
+    )
+    with urlopen(request, timeout=300) as response:
+        payload = json.loads(response.read())
+    content = payload["choices"][0]["message"]["content"]
+    parsed = json.loads(content)
+    if not isinstance(parsed, dict):
+        raise ValueError("English translation is not a JSON object")
+    return parsed
+
+
+def validate_translation(source: Mapping[str, object], translated: Mapping[str, object]) -> dict:
+    """Keep the second model call a translation, not a second market judgement."""
+
+    try:
+        validator.validate_analysis(translated)
+    except validator.InvalidAnalysisError as exc:
+        raise ValueError("English translation contract failed: " + "; ".join(exc.errors)) from exc
+
+    immutable_paths = (
+        ("analysis_date",), ("pressure_state",), ("bottoming_state",), ("consistency",),
+        ("categories",), ("state_changes",),
+    )
+    for path in immutable_paths:
+        source_value: object = source
+        translated_value: object = translated
+        for key in path:
+            source_value = source_value.get(key) if isinstance(source_value, Mapping) else None
+            translated_value = translated_value.get(key) if isinstance(translated_value, Mapping) else None
+        if path in (("categories",), ("state_changes",)):
+            continue
+        if source_value != translated_value:
+            raise ValueError(f"English translation changed immutable field: {'.'.join(path)}")
+
+    source_categories = source.get("categories")
+    translated_categories = translated.get("categories")
+    if not isinstance(source_categories, list) or not isinstance(translated_categories, list) or len(source_categories) != len(translated_categories):
+        raise ValueError("English translation changed category structure")
+    for original, english in zip(source_categories, translated_categories):
+        if not isinstance(original, Mapping) or not isinstance(english, Mapping) or original.get("id") != english.get("id") or original.get("status") != english.get("status"):
+            raise ValueError("English translation changed category facts")
+
+    source_changes = source.get("state_changes")
+    translated_changes = translated.get("state_changes")
+    if not isinstance(source_changes, Mapping) or not isinstance(translated_changes, Mapping):
+        raise ValueError("English translation changed state-change structure")
+    for axis in ("pressure", "bottoming"):
+        original, english = source_changes.get(axis), translated_changes.get(axis)
+        if not isinstance(original, Mapping) or not isinstance(english, Mapping):
+            raise ValueError("English translation changed state-change facts")
+        for field in ("changed", "from", "to", "compared_date"):
+            if original.get(field) != english.get(field):
+                raise ValueError(f"English translation changed {axis}.{field}")
+    return dict(translated)
+
+
+def _mock_translation(analysis: Mapping[str, object]) -> dict:
+    """Stable fixture text for --mock-ai; it never represents a real model call."""
+
+    translated = json.loads(json.dumps(dict(analysis), ensure_ascii=False))
+    translated["summary"] = "This English text is a deterministic local fixture for checking the bilingual layout."
+    compact = translated.get("compact", {})
+    if isinstance(compact, dict):
+        labels = {"pressure": "Pressure depth", "bottoming": "Bottoming process", "change": "Recent change"}
+        for key, item in compact.items():
+            if isinstance(item, dict):
+                item["title"] = labels.get(key, "Evidence")
+                item["text"] = "Deterministic local translation fixture; the Chinese analysis remains the source of facts."
+    detailed = translated.get("detailed", {})
+    if isinstance(detailed, dict):
+        for key in detailed:
+            detailed[key] = "Deterministic local translation fixture; no market judgement was changed."
+    categories = translated.get("categories", [])
+    if isinstance(categories, list):
+        for item in categories:
+            if isinstance(item, dict):
+                item["note"] = "Deterministic local translation fixture."
+    changes = translated.get("state_changes", {})
+    if isinstance(changes, dict):
+        for item in changes.values():
+            if isinstance(item, dict):
+                item["reason"] = "Deterministic local translation fixture."
+    return translated
+
+
+def translate_analysis(analysis: Mapping[str, object], *, mock: bool = False) -> tuple[dict | None, str | None]:
+    """Translate an already validated Chinese analysis without re-judging it."""
+
+    if mock:
+        try:
+            return validate_translation(analysis, _mock_translation(analysis)), None
+        except ValueError as exc:
+            return None, f"mock 英文翻译契约校验失败: {str(exc)[:160]}"
+    api_key = os.environ.get("AI_API_KEY")
+    if not api_key:
+        return None, "未配置 AI_API_KEY，跳过英文 AI 翻译"
+    base_url = os.environ.get("AI_BASE_URL", "").strip() or DEFAULT_BASE_URL
+    model = os.environ.get("AI_MODEL", "").strip() or DEFAULT_MODEL
+    try:
+        return validate_translation(analysis, _chat_translation(analysis, api_key, base_url, model)), None
+    except (HTTPError, URLError, TimeoutError, ConnectionError, OSError, KeyError, TypeError, ValueError) as exc:
+        return None, f"英文 AI 翻译失败: {type(exc).__name__}: {str(exc)[:120]}"
 
 
 def _tier_rank(value: object) -> int:
@@ -335,4 +472,4 @@ def call_ai(
     return None, last_error or "AI 输出不可用"
 
 
-__all__ = ["call_ai", "data_insufficient_analysis"]
+__all__ = ["call_ai", "data_insufficient_analysis", "translate_analysis", "validate_translation"]

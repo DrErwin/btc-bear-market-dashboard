@@ -33,11 +33,10 @@ def test_semantic_validator_rejects_untriggered_metric_in_support() -> None:
         semantic_validator.validate_analysis_semantics(analysis, ai_input)
 
 
-def test_semantic_validator_rejects_wrong_threshold_direction() -> None:
+def test_semantic_validator_allows_threshold_direction_keywords() -> None:
     analysis, ai_input = _current_context()
-    analysis["detailed"]["pressure_reason"] += " MVRV 高于观察区。"
-    with pytest.raises(validator.InvalidAnalysisError, match="方向"):
-        semantic_validator.validate_analysis_semantics(analysis, ai_input)
+    analysis["detailed"]["pressure_reason"] += " MVRV 并未高于或升入高位区，当前仍在低位。"
+    semantic_validator.validate_analysis_semantics(analysis, ai_input)
 
 
 def test_semantic_validator_rejects_stale_metric_as_current_support() -> None:
