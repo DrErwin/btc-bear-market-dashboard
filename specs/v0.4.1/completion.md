@@ -1,6 +1,6 @@
 # v0.4.1：完成情况
 
-> 状态：代码与离线验收完成；真实英文 AI 翻译待运行环境配置 `AI_API_KEY` 后的下一次每日任务验证。
+> 状态：已上线。中文分析和双语界面可用；英文 AI 详细翻译因措辞校验失败而降级。
 
 ## 本次记录
 
@@ -15,26 +15,30 @@
 
 ## 当前基线
 
-当前本地基线为提交 `286e1c0 feat: move social links beside dashboard title`。它包含 v0.4.0 双轴界面、CVDD 可用状态修订和标题外部链接，尚未包含 v0.4.1 的任何功能。
+- 完整版本合并提交：`0311dcf merge: publish current dashboard version`。
+- 真实日更数据提交：`fcee9d1 chore(data): daily packet update 2026-08-02`。
+- 生产记录提交：`9667f32 docs: record current production rerun`。
 
 ## 验证状态
 
 已完成下列离线验收：
 
 - `npm run build` 通过（保留原有 Vite 大包提示）。
-- `python tests/acceptance/run_acceptance.py` 通过：76 个 Python 合约测试，以及中文默认、英文切换与刷新保持、英文翻译缺失提示、三栏说明、来源链接和窄屏浏览器检查。
+- `python tests/acceptance/run_acceptance.py` 通过：`87 passed, 1 skipped`。跳过项依赖未纳入仓库的本地研究原型文件。
+- 前端生产构建和浏览器页面检查通过，覆盖中文默认、英文切换与刷新保持、英文翻译缺失提示、三栏说明、来源链接和窄屏布局。
 - 新增英文翻译合约：测试确认翻译不能改变压力状态、筑底状态、一致性、类别事实或状态变化事实。
+- 真实任务 [GitHub Actions 30757701796](https://github.com/DrErwin/btc-bear-market-dashboard/actions/runs/30757701796) 全部通过。
+- 线上包为 `run_id=20260802T165508Z`、`data_date=2026-08-02`、`analysis_date=2026-08-02`、`today_available=true`。
 
-尚未完成的真实环境验证：
-
-- 当前环境未配置 `AI_API_KEY`，因此无法对现有中文分析执行真实英文翻译，也不能把本地夹具当成真实模型验收；配置后运行下一次每日任务即可生成并验证 `analysis_en`。
+真实环境已经配置 `AI_API_KEY` 并完成调用。中文分析通过校验；英文译文触发交易/后台术语检查，系统写入 `analysis_en=null` 和失败原因。英文页面显示不可用提示，中文双轴判断保持有效。
 
 被迁移到 v0.4.2 的验证事项，见 [v0.4.2 完成情况](../v0.4.2/completion.md)。
 
-## 下一步
+## 遗留与下一步
 
-在每日运行环境配置 `AI_API_KEY` 后，执行一次非 `--mock-ai` 的每日任务并核对英文结果；Prompt 的人工判断接入与 SIPL 删除仍按 v0.4.2 计划处理。
+- 修复英文翻译校验对 `long`、`triggered` 等词的语境识别，再执行一次真实日更验证 `analysis_en`。
+- Prompt 的人工判断接入与 SIPL 删除仍按 v0.4.2 计划处理。
 
 ## 生产运行说明
 
-2026-07-31 完成的 GLM-5.2 日更回退故障修复属于已上线的 v0.4.0 运行契约，不属于本版本的双语功能。原因、代码改动、提交、真实任务和线上结果统一记录在 [v0.4.0 生产 AI 日更修复记录](../v0.4.0/production-ai-daily-fix-2026-07-31.md)，本文件不重复维护。
+GLM-5.2 日更回退、2026-08-03 方向关键词检查暂停和真实重跑记录统一保存在 [v0.4.0 生产 AI 日更修复记录](../v0.4.0/production-ai-daily-fix-2026-07-31.md)。
