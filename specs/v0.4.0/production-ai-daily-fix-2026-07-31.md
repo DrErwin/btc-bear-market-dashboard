@@ -74,3 +74,12 @@
 现有实现会把支持区域的多段文字拼接后，直接搜索“高于、低于、高位、低位、上穿、下穿、升入、跌入”等词。由于失败记录没有保存完整原句，无法排除“并未高于”一类否定语境被误判。经确认，本阶段只暂停这项方向关键词扫描；其他事实、边界和结构检查继续生效，三次生成与失败回退机制保持不变。
 
 具体范围和恢复条件见 [阈值方向关键词检查暂停设计](threshold-direction-keyword-check-pause-2026-08-03.md)。
+
+### 上线与真实重跑结果
+
+- 完整版本合并提交：`0311dcf merge: publish current dashboard version`。
+- 手动日更：[GitHub Actions 30757701796](https://github.com/DrErwin/btc-bear-market-dashboard/actions/runs/30757701796)，所有步骤通过。
+- 日更数据提交：`fcee9d1 chore(data): daily packet update 2026-08-02`。
+- 线上包：`run_id=20260802T165508Z`、`data_date=2026-08-02`、`analysis_date=2026-08-02`、`today_available=true`、`reason=null`。
+- 中文双轴结果恢复为“压力尚未明显／筑底线索出现”。
+- 英文 AI 翻译单独降级：译文触发交易/后台术语检查，因此 `analysis_en=null`；这不改变中文分析、双轴判断或日更健康状态，后续需单独修复英文措辞校验。
