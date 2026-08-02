@@ -1087,7 +1087,7 @@ a:focus-visible {
 
 .explanation-grid {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(3, 1fr);
 }
 
 .explanation-grid article {
@@ -1115,6 +1115,52 @@ a:focus-visible {
 
 .explanation-grid strong {
   color: var(--ink);
+}
+
+.explanation-source {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 12px 14px;
+  border-top: 1px solid var(--line);
+  background: #f5f6f0;
+  color: #465550;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.explanation-source > span {
+  flex: 0 0 auto;
+  color: var(--orange-deep);
+  font-size: 9px;
+  letter-spacing: 0.04em;
+}
+
+.explanation-source a {
+  color: var(--mint-deep);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.explanation-source p {
+  margin: 0;
+}
+
+.language-switch {
+  border: 1px solid #526260;
+  background: transparent;
+  color: #c5d1cd;
+  cursor: pointer;
+  font-family: "Cascadia Mono", Consolas, monospace;
+  font-size: 10px;
+  line-height: 1;
+  padding: 6px 8px;
+}
+
+.language-switch:hover,
+.language-switch:focus-visible {
+  border-color: var(--orange);
+  color: var(--white);
 }
 
 .site-footer {
@@ -1248,17 +1294,12 @@ a:focus-visible {
     grid-template-columns: minmax(220px, 280px) minmax(0, 1fr);
   }
 
-  .explanation-grid {
-    grid-template-columns: repeat(2, 1fr);
-  }
+  .explanation-grid { grid-template-columns: 1fr; }
 
-  .explanation-grid article:nth-child(odd) {
-    border-left: 0;
-  }
+  .explanation-grid article,
+  .explanation-grid article + article { border-left: 0; }
 
-  .explanation-grid article:nth-child(n + 3) {
-    border-top: 1px solid var(--line);
-  }
+  .explanation-grid article + article { border-top: 1px solid var(--line); }
 }
 
 @media (max-width: 760px) {
@@ -1281,6 +1322,8 @@ a:focus-visible {
     justify-items: end;
     gap: 4px;
   }
+
+  .language-switch { padding: 5px 7px; }
 
   .topbar-date {
     display: none;
@@ -1414,7 +1457,6 @@ a:focus-visible {
   }
 
   .explanation-grid article,
-  .explanation-grid article:nth-child(n + 3),
   .explanation-grid article + article {
     border-top: 0;
     border-left: 0;
@@ -1422,6 +1464,12 @@ a:focus-visible {
 
   .explanation-grid article + article {
     border-top: 1px solid var(--line);
+  }
+
+  .explanation-source {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 5px;
   }
 
   .site-footer {

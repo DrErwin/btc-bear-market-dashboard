@@ -34,6 +34,8 @@ export async function loadDashboardData(): Promise<DashboardData> {
     bottoms: packet.bottoms ?? [],
     analysis: packet.analysis,
     fallback: packet.fallback,
+    analysisEn: packet.analysis_en ?? null,
+    fallbackEn: packet.fallback_en ?? null,
     status: packet.status,
     fixture,
     runId: packet.run_id ?? null,

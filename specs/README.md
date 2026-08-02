@@ -12,16 +12,17 @@
 | `v0.2.4` | 当前公开界面版本记录 | [需求](v0.2.4/requirements.md) · [实现记录](v0.2.4/implementation-record.md) · [图表配置](v0.2.4/btc-indicator-config-2026-07-28.json) | 图表参考线、多曲线、3 日／7 日平滑线、曲线开关与自适应纵轴；本版本只记录图表层。线上数据契约现场核对仍为 `0.2.0`。 |
 | `v0.3.0` | 历史版本（已被 v0.4.0 取代） | [体系设计](v0.3.0/indicator-evidence-system-design.md) · [工作计划](v0.3.0/indicator-evidence-system-work-plan.md) · [验收记录](v0.3.0/acceptance-record.md) | 建立指标角色、数据质量闸门和证据编译思路；其中单一 `allowed_stages` 阶段契约仅保留作历史记录。 |
 | `v0.3.1` | 历史本地基线（已被 v0.4.0 取代） | [需求](v0.3.1/requirements.md) · [实现记录](v0.3.1/implementation-record.md) | 统一状态阈值与图表阈值；阈值数值、方向、顺序和人工三档含义由 v0.4.0 继续保留。 |
-| `v0.4.0` | 本地已实现并验收，未部署 | [实施规格](v0.4.0/implementation-spec.md) · [实现记录](v0.4.0/implementation-record.md) · [验收记录](v0.4.0/acceptance-record.md) · [历史窗口验证](v0.4.0/lookback-validation.json) · [状态模型设计](v0.4.0/market-state-model-design.md) | 双轴市场状态（压力轴 + 筑底轴）、稳定档位身份、指标职责与相关性家族、有限时间线、前三个自然日上下文、六段详细解释和完整结果包。 |
-| `v0.4.1` | 计划中 | [需求](v0.4.1/requirements.md) · [完成情况](v0.4.1/completion.md) | 用户指标判断进入 AI Prompt、普通人可理解的指标含义、指标解释栏悬浮展开公式/含义/用法、删除 SIPL 指标。 |
+| `v0.4.0` | 已上线 | [实施规格](v0.4.0/implementation-spec.md) · [实现记录](v0.4.0/implementation-record.md) · [验收记录](v0.4.0/acceptance-record.md) · [生产 AI 日更修复](v0.4.0/production-ai-daily-fix-2026-07-31.md) · [历史窗口验证](v0.4.0/lookback-validation.json) · [状态模型设计](v0.4.0/market-state-model-design.md) | 双轴市场状态、稳定档位身份、证据职责/相关性、有限时间线和受约束的 GLM-5.2 日更；2026-07-31 已完成生产回退故障修复与线上验证。 |
+| `v0.4.1` | 本地已实现并验收，未部署 | [需求](v0.4.1/requirements.md) · [完成情况](v0.4.1/completion.md) · [实现设计](v0.4.1/implementation-design.md) · [指标判断说明](indicator-judgment-guide.md) | 中英文界面切换；普通人可理解的指标含义；底部说明栏改为公式、含义、使用三栏，来源置于下方。 |
+| `v0.4.2` | 计划中 | [需求](v0.4.2/requirements.md) · [完成情况](v0.4.2/completion.md) · [指标判断说明](indicator-judgment-guide.md) | 用户指标判断进入 AI Prompt、删除 SIPL 指标。 |
 
 ## 版本规则
 
 - `v0.1.0` 是最初的固定数据历史版本。
 - `v0.2.0` 至 `v0.2.4` 记录每日更新和图表交互的演进；当前公开界面版本记录为 `v0.2.4`，线上数据契约仍为 `0.2.0`。
 - `v0.3.0` 和 `v0.3.1` 是历史实现记录；其中的 `allowed_stages` 与旧单阶段输出不再是当前运行契约。
-- `v0.4.0` 是当前本地运行基线，建立在既有指标派生和图表能力之上，但用压力轴与筑底轴替代单一总阶段。
-- v0.4.0 的 `schema/config` 均为 `0.4.0`；公开线上版本仍需单独部署和核验，不能由本地验收自动推断。
-- `v0.4.1` 目前只记录需求，尚未修改运行代码；实现前不得把计划中的交互或 Prompt 语义当作已上线能力。
+- `v0.4.0` 是当前线上运行基线，建立在既有指标派生和图表能力之上，用压力轴与筑底轴替代单一总阶段；其 `schema/config` 均为 `0.4.0`。
+- `v0.4.1` 已在本地完成代码和离线验收，但尚未推送或部署，不能把双语界面和英文 AI 翻译当作线上能力。
+- `v0.4.2` 目前只记录需求和准备资料，尚未开始实现。
 - “本地已验收”不等于“已上线”；必须有提交、推送、部署和线上核验记录后才能改为已发布。
 - 需要发布新的功能时，先更新对应版本的需求与验收标准，再修改代码。

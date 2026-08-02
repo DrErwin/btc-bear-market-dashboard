@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { Metric } from "../types";
 import { tierClass } from "../utils/tier";
+import { useI18n } from "../i18n";
 
 const props = defineProps<{
   metrics: Metric[];
@@ -10,6 +11,7 @@ const props = defineProps<{
 const emit = defineEmits<{
   select: [metricId: string];
 }>();
+const { t, metric: metricCopy, role, state } = useI18n();
 
 type AvailabilityKey = "current" | "display_only" | "validation_pending" | "missing";
 
@@ -68,10 +70,10 @@ function availabilityState(metric: Metric): AvailabilityKey {
 
 function availabilityLabel(metric: Metric) {
   return {
-    current: "当前可用",
-    display_only: "仅供展示",
-    validation_pending: "待验证",
-    missing: "缺失",
+    current: t("current"),
+    display_only: t("displayOnly"),
+    validation_pending: t("validation"),
+    missing: t("missing"),
   }[availabilityState(metric)];
 }
 
@@ -83,13 +85,13 @@ function availabilityNote(metric: Metric) {
   if (state === "current" && metric.judgment_eligible !== false) return "";
   const parts: string[] = [];
   if (typeof metric.days_stale === "number" && metric.days_stale > 0) {
-    parts.push(`已过期 ${metric.days_stale} 天`);
+    parts.push(t("expired", { days: metric.days_stale }));
   }
   const reason = metric.availability_reason ?? metric.reason;
   if (reason?.trim()) {
     parts.push(reason.trim());
   }
-  if (state !== "current") parts.push("不参与当前判断");
+  if (state !== "current") parts.push(t("notPart"));
   return Array.from(new Set(parts)).join(" · ");
 }
 
@@ -105,7 +107,7 @@ function moveFocus(event: KeyboardEvent, index: number) {
 </script>
 
 <template>
-  <div class="metric-list" aria-label="当前分类指标列表">
+  <div class="metric-list" aria-label="Metric list for the selected category">
     <button
       v-for="(metric, index) in metrics"
       :id="`metric-${metric.id}`"
@@ -114,17 +116,17 @@ function moveFocus(event: KeyboardEvent, index: number) {
       class="metric-card"
       :class="{ 'is-active': activeMetricId === metric.id }"
       :aria-pressed="activeMetricId === metric.id"
-      :aria-label="`${metric.label}，${roleLabel(metric)}，${availabilityLabel(metric)}，当前档位${metric.tier_label}`"
+      :aria-label="`${metricCopy(metric).label} · ${role(roleLabel(metric))} · ${availabilityLabel(metric)} · ${state(metric.tier_label)}`"
       @click="emit('select', metric.id)"
       @keydown="moveFocus($event, index)"
     >
-      <span class="metric-role" :class="roleClass(metric)">{{ roleLabel(metric) }}</span>
+      <span class="metric-role" :class="roleClass(metric)">{{ role(roleLabel(metric)) }}</span>
       <span class="metric-main">
-        <strong>{{ metric.label }}</strong>
-        <small>{{ metric.current_date || metric.metric_date || "日期未知" }} · {{ metric.unit }}</small>
+        <strong>{{ metricCopy(metric).label }}</strong>
+        <small>{{ metric.current_date || metric.metric_date || t("unknownDate") }} · {{ metric.unit }}</small>
       </span>
       <span class="metric-value">{{ metric.display_value }}</span>
-      <span class="metric-tier" :class="tierClass(metric.tier_id, metric.tier_label)">{{ metric.tier_label }}</span>
+      <span class="metric-tier" :class="tierClass(metric.tier_id, metric.tier_label)">{{ state(metric.tier_label) }}</span>
       <span class="metric-availability" :class="`availability-${availabilityState(metric)}`">{{ availabilityLabel(metric) }}</span>
       <small v-if="availabilityNote(metric)" class="metric-availability-note">{{ availabilityNote(metric) }}</small>
     </button>

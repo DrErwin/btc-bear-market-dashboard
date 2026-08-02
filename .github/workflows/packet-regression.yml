@@ -1,0 +1,41 @@
+name: packet-regression
+
+on:
+  pull_request:
+    paths:
+      - dashboard/public/data/packet.json
+      - scripts/automation_health.py
+      - .github/workflows/packet-regression.yml
+  push:
+    branches:
+      - main
+    paths:
+      - dashboard/public/data/packet.json
+      - scripts/automation_health.py
+      - .github/workflows/packet-regression.yml
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout full comparison history
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Reject a regressed packet on pull requests
+        if: github.event_name == 'pull_request'
+        run: >-
+          python scripts/automation_health.py packet-regression
+          --base "${{ github.event.pull_request.base.sha }}"
+          --head "${{ github.event.pull_request.head.sha }}"
+
+      - name: Reject a regressed packet on main
+        if: github.event_name == 'push'
+        run: >-
+          python scripts/automation_health.py packet-regression
+          --base "${{ github.event.before }}"
+          --head "${{ github.sha }}"

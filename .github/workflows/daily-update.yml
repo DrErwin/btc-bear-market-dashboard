@@ -60,3 +60,6 @@ jobs:
           fi
           git commit -m "chore(data): daily packet update $(date -u +%Y-%m-%d)"
           git push
+
+      - name: Require a current daily result
+        run: python scripts/automation_health.py daily-outcome

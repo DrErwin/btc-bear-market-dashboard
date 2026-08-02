@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useI18n } from "../i18n";
 defineProps<{
   analysisDate: string | null;
   isFallback: boolean;
@@ -7,19 +8,20 @@ defineProps<{
 const emit = defineEmits<{
   openMethod: [];
 }>();
+const { locale, setLocale, t } = useI18n();
 </script>
 
 <template>
   <header class="topbar">
     <div class="brand-lockup">
-      <a class="brand-link" href="#top" aria-label="回到看板顶部">
+      <a class="brand-link" href="#top" :aria-label="t('dashboardTitle')">
       <span class="brand-mark" aria-hidden="true">BΞ</span>
       <span>
         <span class="brand-kicker">CYCLE EVIDENCE / 01</span>
-        <span class="brand-name">BTC 熊底证据看板</span>
+        <span class="brand-name">{{ t("dashboardTitle") }}</span>
       </span>
       </a>
-      <nav class="social-links" aria-label="外部链接">
+      <nav class="social-links" aria-label="Social links">
         <a
           class="social-link"
           href="https://x.com/ErwinWu000"
@@ -47,12 +49,13 @@ const emit = defineEmits<{
       </nav>
     </div>
     <div class="topbar-meta">
+      <button class="language-switch" type="button" :aria-label="t('language')" @click="setLocale(locale === 'zh' ? 'en' : 'zh')">{{ t("language") }}</button>
       <span class="data-stamp">
         <span class="status-dot" :class="{ 'is-fallback': isFallback }" aria-hidden="true"></span>
-        {{ isFallback ? "上一份成功分析" : "每日快照" }}
+        {{ isFallback ? t("previousSuccess") : t("dailySnapshot") }}
       </span>
-      <span class="topbar-date">{{ analysisDate || "等待可用分析" }}</span>
-      <button class="text-button" type="button" @click="emit('openMethod')">方法说明 <span aria-hidden="true">↗</span></button>
+      <span class="topbar-date">{{ analysisDate || t("waiting") }}</span>
+      <button class="text-button" type="button" @click="emit('openMethod')">{{ t("method") }} <span aria-hidden="true">↗</span></button>
     </div>
   </header>
 </template>

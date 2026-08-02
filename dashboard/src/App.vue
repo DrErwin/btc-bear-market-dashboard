@@ -9,6 +9,7 @@ import SharedChart from "./components/SharedChart.vue";
 import MetricExplanation from "./components/MetricExplanation.vue";
 import { loadDashboardData } from "./composables/useDashboardData";
 import type { Analysis, CategoryAssessment, DashboardData, Metric } from "./types";
+import { useI18n } from "./i18n";
 
 const data = ref<DashboardData | null>(null);
 const loading = ref(true);
@@ -18,6 +19,7 @@ const activeMetricId = ref("mvrv");
 const detailsOpen = ref(false);
 const methodOpen = ref(false);
 const railCollapsed = ref(false);
+const { locale, t, detail, category, metric: metricCopy, state } = useI18n();
 
 onMounted(async () => {
   try {
@@ -29,10 +31,19 @@ onMounted(async () => {
   }
 });
 
-const analysis = computed<Analysis | null>(() => {
+const chineseAnalysis = computed<Analysis | null>(() => {
   if (!data.value) return null;
   return data.value.analysis ?? data.value.fallback;
 });
+const analysis = computed<Analysis | null>(() => {
+  if (!data.value || locale.value !== "en") return chineseAnalysis.value;
+  return data.value.analysis
+    ? data.value.analysisEn ?? data.value.analysis
+    : data.value.fallbackEn ?? data.value.fallback;
+});
+const englishAnalysisUnavailable = computed(() => Boolean(
+  locale.value === "en" && (data.value?.analysis ? !data.value.analysisEn : data.value?.fallback ? !data.value.fallbackEn : false),
+));
 
 const isFallback = computed(() => Boolean(data.value && !data.value.status.today_available && data.value.fallback));
 const assessments = computed<CategoryAssessment[]>(() => analysis.value?.categories ?? []);
@@ -42,15 +53,17 @@ const detailSections = computed(() => {
   const detailed = current.detailed ?? {};
   const quality = data.value?.evidenceBrief?.data_quality;
   const qualityText = quality
-    ? `数据状态：${data.value?.status.data_insufficient ? "部分轴暂时不足" : "两条轴均有可用输入"}。缺口由指标卡和时间线继续说明。`
+    ? locale.value === "en"
+      ? `Data status: ${data.value?.status.data_insufficient ? "some axis inputs are unavailable" : "both axes have usable inputs"}. Metric cards and the timeline show remaining gaps.`
+      : `数据状态：${data.value?.status.data_insufficient ? "部分轴暂时不足" : "两条轴均有可用输入"}。缺口由指标卡和时间线继续说明。`
     : undefined;
-  const sections = [
-    { id: "pressure_reason", label: "压力判断", text: detailed.pressure_reason },
-    { id: "bottoming_reason", label: "筑底判断", text: detailed.bottoming_reason },
-    { id: "evidence_timeline", label: "证据时间线", text: detailed.evidence_timeline },
-    { id: "contrary_or_gaps", label: "相反证据与缺口", text: detailed.contrary_or_gaps ?? qualityText },
-    { id: "repair_exit", label: "修复与离开窗口", text: detailed.repair_exit },
-    { id: "next_evidence", label: "下一步观察重点", text: detailed.next_evidence },
+  const sections: Array<{ id: string; label: string; text: string | undefined }> = [
+    { id: "pressure_reason", label: detail(0), text: detailed.pressure_reason },
+    { id: "bottoming_reason", label: detail(1), text: detailed.bottoming_reason },
+    { id: "evidence_timeline", label: detail(2), text: detailed.evidence_timeline },
+    { id: "contrary_or_gaps", label: detail(3), text: detailed.contrary_or_gaps ?? qualityText },
+    { id: "repair_exit", label: detail(4), text: detailed.repair_exit },
+    { id: "next_evidence", label: detail(5), text: detailed.next_evidence },
   ];
   return sections.filter((section): section is { id: string; label: string; text: string } => Boolean(section.text?.trim()));
 });
@@ -88,9 +101,9 @@ function closeMethod(event: MouseEvent) {
     />
 
     <main>
-      <div v-if="loading" class="loading-state" role="status">正在读取数据包…</div>
+      <div v-if="loading" class="loading-state" role="status">{{ t("readPacket") }}</div>
       <div v-else-if="error" class="fatal-state" role="alert">
-        <strong>看板暂时无法读取</strong>
+        <strong>{{ t("cannotRead") }}</strong>
         <span>{{ error }}</span>
       </div>
 
@@ -102,6 +115,7 @@ function closeMethod(event: MouseEvent) {
             :today-available="data.status.today_available"
             :last-success-date="data.status.last_success_date"
             :data-insufficient="data.status.data_insufficient"
+            :english-unavailable="englishAnalysisUnavailable"
             :details-open="detailsOpen"
             @toggle-details="detailsOpen = !detailsOpen"
           />
@@ -110,7 +124,7 @@ function closeMethod(event: MouseEvent) {
             :bottoming-state="analysis?.bottoming_state ?? null"
           />
 
-          <section v-if="analysis && detailsOpen && detailSections.length" class="detail-drawer" aria-label="详细分析">
+          <section v-if="analysis && detailsOpen && detailSections.length" class="detail-drawer" aria-label="Detailed analysis">
             <article v-for="section in detailSections" :key="section.id">
               <span class="eyebrow">{{ section.label }}</span>
               <p>{{ section.text }}</p>
@@ -121,10 +135,10 @@ function closeMethod(event: MouseEvent) {
         <section class="evidence-board" aria-labelledby="board-title">
           <div class="section-heading">
             <div>
-              <span class="eyebrow">分类指标看板 / 16 个周期指标</span>
-              <h2 id="board-title">从证据结构进入单项检查</h2>
+              <span class="eyebrow">{{ t("boardEyebrow") }}</span>
+              <h2 id="board-title">{{ t("boardTitle") }}</h2>
             </div>
-            <p>先看六类状态，再选择一个指标查看共享图表与阈值语义。</p>
+            <p>{{ t("boardText") }}</p>
           </div>
 
           <CategoryGrid
@@ -135,7 +149,7 @@ function closeMethod(event: MouseEvent) {
           />
 
           <div class="workbench" :class="{ 'is-rail-collapsed': railCollapsed }">
-            <nav v-if="railCollapsed" class="metric-tabs-compact" aria-label="指标切换">
+            <nav v-if="railCollapsed" class="metric-tabs-compact" aria-label="Metric selection">
               <button
                 v-for="metric in visibleMetrics"
                 :key="metric.id"
@@ -145,20 +159,20 @@ function closeMethod(event: MouseEvent) {
                 :aria-pressed="metric.id === activeMetricId"
                 @click="selectMetric(metric.id)"
               >
-                {{ metric.label }}
+                {{ metricCopy(metric).label }}
               </button>
-              <button type="button" class="rail-expand-btn" @click="railCollapsed = false">展开指标列</button>
+              <button type="button" class="rail-expand-btn" @click="railCollapsed = false">{{ t("expandMetrics") }}</button>
             </nav>
 
-            <aside v-show="!railCollapsed" class="metric-rail" aria-label="分类指标">
+            <aside v-show="!railCollapsed" class="metric-rail" aria-label="Category metrics">
               <div class="rail-heading">
                 <div>
-                  <span class="eyebrow">当前分类</span>
-                  <h3>{{ activeCategory?.name }}</h3>
+                  <span class="eyebrow">{{ t("currentCategory") }}</span>
+                  <h3 v-if="activeCategory">{{ category(activeCategory) }}</h3>
                 </div>
                 <div class="rail-heading-actions">
-                  <span class="rail-count">{{ visibleMetrics.length }} 项</span>
-                  <button class="rail-collapse-btn" type="button" @click="railCollapsed = true">收起指标列</button>
+                  <span class="rail-count">{{ visibleMetrics.length }} {{ t("itemCount") }}</span>
+                  <button class="rail-collapse-btn" type="button" @click="railCollapsed = true">{{ t("collapseMetrics") }}</button>
                 </div>
               </div>
               <MetricList
@@ -166,7 +180,7 @@ function closeMethod(event: MouseEvent) {
                 :active-metric-id="activeMetricId"
                 @select="selectMetric"
               />
-              <p class="rail-note">角色与数据状态分开标注；过期或待验证指标仍保留展示，但不参与当前判断。</p>
+              <p class="rail-note">{{ t("railNote") }}</p>
             </aside>
 
             <div v-if="activeMetric && activeCategory" class="chart-column">
@@ -180,20 +194,20 @@ function closeMethod(event: MouseEvent) {
 
     <footer class="site-footer">
       <div>
-        <strong>研究导向的周期证据</strong>
-        <span>看板解释当前快照，不宣称识别确切最低点。</span>
+        <strong>{{ t("footerTitle") }}</strong>
+        <span>{{ t("footerText") }}</span>
       </div>
-      <span>仅作公开研究参考 · 不构成交易建议</span>
+      <span>{{ t("disclaimer") }}</span>
     </footer>
 
     <div v-if="methodOpen" class="dialog-backdrop" role="presentation" @click="closeMethod">
       <section class="method-dialog" role="dialog" aria-modal="true" aria-labelledby="method-title">
-        <button class="dialog-close" type="button" aria-label="关闭方法说明" @click="methodOpen = false">×</button>
-        <span class="eyebrow">方法边界</span>
-        <h2 id="method-title">把复杂指标变成可检查的证据结构</h2>
-        <p>看板每天使用一份固定的指标快照，分别读取压力深度和筑底过程两条轴。当前值、阈值语义和来源限制始终留在指标区域，方便你自己复核。</p>
-        <p>图表仅用于检查指标和 BTC 价格的共同时间范围；它与每日双轴分析分开，刷新页面不会重新生成结论。</p>
-        <button class="primary-button" type="button" @click="methodOpen = false">返回看板</button>
+        <button class="dialog-close" type="button" aria-label="Close method dialog" @click="methodOpen = false">×</button>
+        <span class="eyebrow">{{ t("methodEyebrow") }}</span>
+        <h2 id="method-title">{{ t("methodTitle") }}</h2>
+        <p>{{ t("methodText1") }}</p>
+        <p>{{ t("methodText2") }}</p>
+        <button class="primary-button" type="button" @click="methodOpen = false">{{ t("returnDashboard") }}</button>
       </section>
     </div>
   </div>

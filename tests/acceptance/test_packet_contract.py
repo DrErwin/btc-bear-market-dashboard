@@ -62,3 +62,34 @@ def test_mock_provider_returns_compliant_v04_analysis() -> None:
     analysis, reason = provider.call_ai(payload["snapshot"], data_date=payload["data_date"], mock=True)
     assert reason is None
     assert analysis and analysis["pressure_state"] and analysis["bottoming_state"]
+
+
+def test_mock_english_translation_preserves_all_market_facts() -> None:
+    payload = json.loads(PACKET_PATH.read_text(encoding="utf-8"))
+    translated, reason = provider.translate_analysis(payload["analysis"], mock=True)
+    assert reason is None
+    assert translated is not None
+    for field in ("analysis_date", "pressure_state", "bottoming_state", "consistency"):
+        assert translated[field] == payload["analysis"][field]
+    for original, english in zip(payload["analysis"]["categories"], translated["categories"]):
+        assert english["id"] == original["id"]
+        assert english["status"] == original["status"]
+    assert translated["summary"] != payload["analysis"]["summary"]
+
+
+def test_packet_rejects_english_analysis_that_changes_a_state(good: dict) -> None:
+    translated, reason = provider.translate_analysis(good["analysis"], mock=True)
+    assert reason is None and translated is not None
+    translated["pressure_state"] = "极端压力"
+    good["analysis_en"] = translated
+    with pytest.raises(packet.PacketValidationError, match="analysis_en.pressure_state"):
+        packet.validate_packet(good)
+
+
+def test_packet_rejects_english_analysis_that_changes_category_facts(good: dict) -> None:
+    translated, reason = provider.translate_analysis(good["analysis"], mock=True)
+    assert reason is None and translated is not None
+    translated["categories"][0]["status"] = "充分确认"
+    good["analysis_en"] = translated
+    with pytest.raises(packet.PacketValidationError, match="analysis_en.categories\\[0\\]"):
+        packet.validate_packet(good)
