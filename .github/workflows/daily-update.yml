@@ -1,17 +1,12 @@
 name: daily-update
 
-# Requirement 4: a fixed daily Shanghai-time run + manual trigger. Fetches public base
+# Scheduled updates disabled; manual trigger retained. Fetches public base
 # series, derives the 16 indicators, asks the constrained AI, validates, and
 # publishes ONE complete packet. On any AI failure the previous success is kept
 # as fallback (today_available=false); on a data-source failure the previous
 # packet is left untouched. Pushing packet.json lets Cloudflare rebuild + deploy.
 
 on:
-  schedule:
-    # 12:00 Asia/Shanghai daily. GitHub may start a scheduled job a few minutes
-    # late when its shared runner queue is busy.
-    - cron: '0 12 * * *'
-      timezone: "Asia/Shanghai"
   workflow_dispatch:
 
 permissions:
